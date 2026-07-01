@@ -1,35 +1,56 @@
-name: Build Android APK
+name: Build Android APK (No Firebase)
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      - name: Install Gradle
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
       - name: Generate Gradle Wrapper
         run: gradle wrapper
 
-      - name: Make wrapper executable
+      - name: Make Wrapper Executable
         run: chmod +x gradlew
 
-      - name: Build Debug APK
+      - name: Disable Firebase
+        run: |
+          sed -i '/com.google.gms.google-services/d' app/build.gradle.kts
+          sed -i '/com.google.firebase/d' app/build.gradle.kts
+          sed -i '/google-services/d' build.gradle.kts || true
+          sed -i '/firebase/d' build.gradle.kts || true
+
+      - name: Remove Custom Debug Signing
+        run: |
+          sed -i '/signingConfig = signingConfigs.getByName("debugConfig")/d' app/build.gradle.kts
+
+      - name: Generate Debug Keystore
+        run: |
+          keytool -genkeypair \
+            -alias androiddebugkey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -keystore debug.keystore \
+            -storepass android \
+            -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Build APK
         run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
