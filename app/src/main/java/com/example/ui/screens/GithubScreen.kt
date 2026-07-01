@@ -142,16 +142,21 @@ object GitHubApiService {
         val list = mutableListOf<GitHubIssue>()
         for (i in 0 until arr.length()) {
             val obj = arr.getJSONObject(i)
-            if (!obj.has("pull_request")) { // Exclude PRs
+            if (!obj.has("pull_request")) {
+                val labelsArr = obj.optJSONArray("labels")
+                val labels = mutableListOf<String>()
+                if (labelsArr != null) {
+                    for (j in 0 until labelsArr.length()) {
+                        labels.add(labelsArr.getJSONObject(j).getString("name"))
+                    }
+                }
                 list.add(GitHubIssue(
                     number = obj.getInt("number"),
                     title = obj.getString("title"),
                     state = obj.getString("state"),
                     author = obj.getJSONObject("user").getString("login"),
                     createdAt = obj.getString("created_at"),
-                    labels = (0 until obj.optJSONArray("labels")?.length() ?: 0).map { j ->
-                        obj.getJSONArray("labels").getJSONObject(j).getString("name")
-                    }
+                    labels = labels
                 ))
             }
         }
@@ -232,20 +237,16 @@ fun GitHubScreen(
     var showTokenDialog by remember { mutableStateOf(false) }
     var tokenInput by remember { mutableStateOf(token) }
 
-    // Tabs
     var activeTab by remember { mutableStateOf(GitHubTab.REPOS) }
     var isLoading by remember { mutableStateOf(false) }
 
-    // Data
     var repos by remember { mutableStateOf(listOf<GitHubRepo>()) }
     var issues by remember { mutableStateOf(listOf<GitHubIssue>()) }
     var pulls by remember { mutableStateOf(listOf<GitHubPR>()) }
     var notifications by remember { mutableStateOf(listOf<GitHubNotification>()) }
 
-    // Selection
     var selectedRepo by remember { mutableStateOf<GitHubRepo?>(null) }
 
-    // Dialogs
     var showCreateRepoDialog by remember { mutableStateOf(false) }
     var showCreateIssueDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf<GitHubRepo?>(null) }
@@ -290,7 +291,9 @@ fun GitHubScreen(
             GitHubTab.REPOS -> loadRepos()
             GitHubTab.NOTIFICATIONS -> loadNotifications()
             GitHubTab.AGENT -> { /* AI Agent tab */ }
-            else -> {}
+            GitHubTab.ISSUES -> { }
+            GitHubTab.PULLS -> { }
+            GitHubTab.ACTIONS -> { }
         }
     }
 
@@ -305,7 +308,6 @@ fun GitHubScreen(
 
     // ==================== DIALOGS ====================
 
-    // Token dialog
     if (showTokenDialog) {
         AlertDialog(
             onDismissRequest = { showTokenDialog = false },
@@ -321,11 +323,7 @@ fun GitHubScreen(
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ZenGold)
                     )
-                    Text(
-                        "Token needs: repo, issues, notifications scopes",
-                        color = YinTextSecondary.copy(alpha = 0.6f),
-                        fontSize = 10.sp
-                    )
+                    Text("Token needs: repo, issues, notifications scopes", color = YinTextSecondary.copy(alpha = 0.6f), fontSize = 10.sp)
                 }
             },
             confirmButton = {
@@ -343,7 +341,6 @@ fun GitHubScreen(
         )
     }
 
-    // Create repo dialog
     if (showCreateRepoDialog) {
         AlertDialog(
             onDismissRequest = { showCreateRepoDialog = false },
@@ -376,7 +373,6 @@ fun GitHubScreen(
         )
     }
 
-    // Create issue dialog
     if (showCreateIssueDialog && selectedRepo != null) {
         AlertDialog(
             onDismissRequest = { showCreateIssueDialog = false },
@@ -406,7 +402,6 @@ fun GitHubScreen(
         )
     }
 
-    // Delete confirm
     showDeleteConfirm?.let { repo ->
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = null },
@@ -415,9 +410,7 @@ fun GitHubScreen(
             confirmButton = {
                 Button(onClick = {
                     val parts = repo.fullName.split("/")
-                    scope.launch(Dispatchers.IO) {
-                        GitHubApiService.deleteRepo(token, parts[0], parts[1])
-                    }
+                    scope.launch(Dispatchers.IO) { GitHubApiService.deleteRepo(token, parts[0], parts[1]) }
                     showDeleteConfirm = null
                     loadRepos()
                 }, colors = ButtonDefaults.buttonColors(containerColor = ZenRed)) {
@@ -429,7 +422,6 @@ fun GitHubScreen(
         )
     }
 
-    // Status toast
     LaunchedEffect(showStatus) {
         if (showStatus) {
             Toast.makeText(context, statusMessage, Toast.LENGTH_SHORT).show()
@@ -440,7 +432,6 @@ fun GitHubScreen(
 
     // ==================== MAIN UI ====================
     Column(modifier = Modifier.fillMaxSize().background(if (isDark) Color(0xFF070709) else Color(0xFFF1F0EC))) {
-        // Header
         Surface(color = if (isDark) YinBlack else YangWhite) {
             Column(modifier = Modifier.statusBarsPadding()) {
                 Row(
@@ -453,25 +444,26 @@ fun GitHubScreen(
                     Icon(Icons.Default.Hub, null, tint = Color(0xFF6E40C9), modifier = Modifier.size(24.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("GITHUB MANAGER", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold,
-                        color = if (isDark) Color(0xFF6E40C9) else Color(0xFF6E40C9), style = MaterialTheme.typography.titleMedium)
+                        color = Color(0xFF6E40C9), style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.weight(1f))
                     IconButton(onClick = { showTokenDialog = true }) {
                         Icon(Icons.Default.Key, "Token", tint = if (token.isNotBlank()) Color.Green else Color.Gray, modifier = Modifier.size(20.dp))
                     }
                 }
 
-                // Tab row
                 Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp),
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 2.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    listOf(
-                        GitHubTab.REPOS to "Repos",
-                        GitHubTab.ISSUES to "Issues",
-                        GitHubTab.PULLS to "PRs",
-                        GitHubTab.NOTIFICATIONS to "Notifications",
-                        GitHubTab.AGENT to "🤖 AI Agent"
-                    ).forEach { (tab, label) ->
+                    GitHubTab.entries.forEach { tab ->
+                        val label = when (tab) {
+                            GitHubTab.REPOS -> "Repos"
+                            GitHubTab.ISSUES -> "Issues"
+                            GitHubTab.PULLS -> "PRs"
+                            GitHubTab.NOTIFICATIONS -> "Notifications"
+                            GitHubTab.ACTIONS -> "Actions"
+                            GitHubTab.AGENT -> "🤖 AI Agent"
+                        }
                         FilterChip(
                             selected = activeTab == tab,
                             onClick = {
@@ -489,16 +481,13 @@ fun GitHubScreen(
             }
         }
 
-        // Loading
         if (isLoading) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = Color(0xFF6E40C9))
         }
 
-        // Content
         Box(modifier = Modifier.fillMaxSize()) {
             when (activeTab) {
                 GitHubTab.REPOS -> {
-                    // Repo selector + list
                     if (repos.isEmpty() && !isLoading) {
                         Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                             Icon(Icons.Default.Folder, null, modifier = Modifier.size(64.dp), tint = Color.Gray.copy(alpha = 0.4f))
@@ -506,17 +495,12 @@ fun GitHubScreen(
                             Text("Add a token to get started", color = Color.Gray.copy(alpha = 0.6f), fontSize = 12.sp)
                         }
                     } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
+                        LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             item {
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                     Text("${repos.size} repositories", color = YinTextSecondary, fontSize = 12.sp)
-                                    Button(onClick = {
-                                        newRepoName = ""; newRepoDesc = ""; newRepoPrivate = false
-                                        showCreateRepoDialog = true
-                                    }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6E40C9)), modifier = Modifier.height(32.dp)) {
+                                    Button(onClick = { newRepoName = ""; newRepoDesc = ""; newRepoPrivate = false; showCreateRepoDialog = true },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6E40C9)), modifier = Modifier.height(32.dp)) {
                                         Icon(Icons.Default.Add, null, modifier = Modifier.size(14.dp), tint = Color.White)
                                         Text("New", color = Color.White, fontSize = 12.sp)
                                     }
@@ -545,7 +529,6 @@ fun GitHubScreen(
                         }
                     }
                 }
-
                 GitHubTab.ISSUES -> {
                     if (selectedRepo == null) {
                         Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -555,25 +538,18 @@ fun GitHubScreen(
                         Column {
                             Row(modifier = Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Text(selectedRepo!!.fullName, color = YinText, fontWeight = FontWeight.Bold)
-                                Button(onClick = {
-                                    newIssueTitle = ""; newIssueBody = ""
-                                    showCreateIssueDialog = true
-                                }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6E40C9)), modifier = Modifier.height(32.dp)) {
+                                Button(onClick = { newIssueTitle = ""; newIssueBody = ""; showCreateIssueDialog = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6E40C9)), modifier = Modifier.height(32.dp)) {
                                     Text("New Issue", color = Color.White, fontSize = 12.sp)
                                 }
                             }
                             LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                items(issues) { issue ->
-                                    IssueCard(issue)
-                                }
-                                if (issues.isEmpty()) {
-                                    item { Text("No issues", color = Color.Gray, modifier = Modifier.padding(16.dp)) }
-                                }
+                                items(issues) { issue -> IssueCard(issue) }
+                                if (issues.isEmpty()) item { Text("No issues", color = Color.Gray, modifier = Modifier.padding(16.dp)) }
                             }
                         }
                     }
                 }
-
                 GitHubTab.PULLS -> {
                     if (selectedRepo == null) {
                         Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -583,17 +559,12 @@ fun GitHubScreen(
                         Column {
                             Text(selectedRepo!!.fullName, color = YinText, fontWeight = FontWeight.Bold, modifier = Modifier.padding(12.dp))
                             LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                items(pulls) { pr ->
-                                    PRCard(pr)
-                                }
-                                if (pulls.isEmpty()) {
-                                    item { Text("No pull requests", color = Color.Gray, modifier = Modifier.padding(16.dp)) }
-                                }
+                                items(pulls) { pr -> PRCard(pr) }
+                                if (pulls.isEmpty()) item { Text("No pull requests", color = Color.Gray, modifier = Modifier.padding(16.dp)) }
                             }
                         }
                     }
                 }
-
                 GitHubTab.NOTIFICATIONS -> {
                     if (notifications.isEmpty() && !isLoading) {
                         Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -601,15 +572,18 @@ fun GitHubScreen(
                         }
                     } else {
                         LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            items(notifications) { notif ->
-                                NotificationCard(notif)
-                            }
+                            items(notifications) { notif -> NotificationCard(notif) }
                         }
                     }
                 }
-
+                GitHubTab.ACTIONS -> {
+                    Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                        Text("🚀 GitHub Actions", color = ZenGold, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text("Coming soon", color = Color.Gray, fontSize = 14.sp)
+                    }
+                }
                 GitHubTab.AGENT -> {
-                    GitHubAgentPanel(token)
+                    GitHubAgentPanel(token, isDark)
                 }
             }
         }
@@ -628,18 +602,14 @@ private fun RepoCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) Color(0xFF6E40C9).copy(alpha = 0.1f) else YinCardBg
-        ),
+        colors = CardDefaults.cardColors(containerColor = if (isSelected) Color(0xFF6E40C9).copy(alpha = 0.1f) else YinCardBg),
         border = if (isSelected) BorderStroke(1.dp, Color(0xFF6E40C9)) else null,
         shape = RoundedCornerShape(10.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    if (repo.isPrivate) Icons.Default.Lock else Icons.Default.Public,
-                    null, tint = if (repo.isPrivate) ZenGold else Color(0xFF4CAF50), modifier = Modifier.size(16.dp)
-                )
+                Icon(if (repo.isPrivate) Icons.Default.Lock else Icons.Default.Public, null,
+                    tint = if (repo.isPrivate) ZenGold else Color(0xFF4CAF50), modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(repo.name, color = YinText, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f))
                 Row {
@@ -677,23 +647,12 @@ private fun RepoCard(
 
 @Composable
 private fun IssueCard(issue: GitHubIssue) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = YinCardBg),
-        shape = RoundedCornerShape(8.dp)
-    ) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = YinCardBg), shape = RoundedCornerShape(8.dp)) {
         Column(modifier = Modifier.padding(10.dp)) {
             Row {
-                Surface(
-                    color = if (issue.state == "open") Color(0xFF4CAF50).copy(alpha = 0.2f) else Color(0xFF9E9E9E).copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text(
-                        if (issue.state == "open") "Open" else "Closed",
-                        color = if (issue.state == "open") Color(0xFF4CAF50) else Color(0xFF9E9E9E),
-                        fontSize = 10.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
+                Surface(color = if (issue.state == "open") Color(0xFF4CAF50).copy(alpha = 0.2f) else Color(0xFF9E9E9E).copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp)) {
+                    Text(if (issue.state == "open") "Open" else "Closed", color = if (issue.state == "open") Color(0xFF4CAF50) else Color(0xFF9E9E9E),
+                        fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                 }
                 Spacer(Modifier.width(8.dp))
                 Text("#${issue.number}", color = YinTextSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
@@ -719,7 +678,8 @@ private fun PRCard(pr: GitHubPR) {
         Column(modifier = Modifier.padding(10.dp)) {
             Row {
                 Surface(color = if (pr.state == "open") Color(0xFF4CAF50).copy(alpha = 0.2f) else Color(0xFFCE93D8).copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp)) {
-                    Text(pr.state.uppercase(), color = if (pr.state == "open") Color(0xFF4CAF50) else Color(0xFFCE93D8), fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    Text(pr.state.uppercase(), color = if (pr.state == "open") Color(0xFF4CAF50) else Color(0xFFCE93D8),
+                        fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                 }
                 Spacer(Modifier.width(8.dp))
                 Text("#${pr.number}", color = YinTextSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
@@ -733,11 +693,9 @@ private fun PRCard(pr: GitHubPR) {
 
 @Composable
 private fun NotificationCard(notification: GitHubNotification) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
+    Card(modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = if (notification.isUnread) Color(0xFF6E40C9).copy(alpha = 0.08f) else YinCardBg),
-        shape = RoundedCornerShape(8.dp)
-    ) {
+        shape = RoundedCornerShape(8.dp)) {
         Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             if (notification.isUnread) {
                 Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF6E40C9)))
@@ -754,58 +712,47 @@ private fun NotificationCard(notification: GitHubNotification) {
 // ==================== AI AGENT PANEL ====================
 
 @Composable
-private fun GitHubAgentPanel(token: String) {
+private fun GitHubAgentPanel(token: String, isDark: Boolean) {
     val context = LocalContext.current
     var commandInput by remember { mutableStateOf("") }
-    var outputText by remember { mutableStateOf("AI Agent ready. Try:\n- list repos\n- create repo <name>\n- list issues <owner/repo>\n- create issue <owner/repo> <title>") }
+    var outputText by remember { mutableStateOf("AI Agent ready.\nTry:\n- list repos\n- create repo <name>\n- list issues <owner/repo>\n- create issue <owner/repo> <title>") }
+    val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("🤖 AI Agent Control", color = Color(0xFF6E40C9), fontWeight = FontWeight.Bold, fontFamily = FontFamily.Serif, fontSize = 18.sp)
         Text("Use natural language or direct API commands", color = YinTextSecondary, fontSize = 12.sp)
 
-        Card(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F0F12))
-        ) {
+        Card(modifier = Modifier.weight(1f).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF0F0F12))) {
             LazyColumn(modifier = Modifier.fillMaxSize().padding(8.dp)) {
                 item {
-                    Text(
-                        outputText,
-                        color = Color(0xFF8CBE91),
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
+                    Text(outputText, color = Color(0xFF8CBE91), fontSize = 12.sp, fontFamily = FontFamily.Monospace)
                 }
             }
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
-                value = commandInput,
-                onValueChange = { commandInput = it },
+                value = commandInput, onValueChange = { commandInput = it },
                 modifier = Modifier.weight(1f).height(48.dp),
                 placeholder = { Text("Agent command...", fontSize = 12.sp) },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF6E40C9)),
                 shape = RoundedCornerShape(10.dp)
             )
-            Button(
-                onClick = {
-                    if (commandInput.isBlank()) return@Button
-                    val cmd = commandInput.lowercase()
-                    outputText = "> $commandInput\n"
-                    if (cmd.contains("list repos")) {
-                        outputText += GitHubApiService.executeRequest(token, "/user/repos?per_page=10")
-                    } else if (cmd.contains("create repo")) {
-                        val name = commandInput.removePrefix("create repo").trim()
-                        outputText += GitHubApiService.createRepo(token, name, "", false)
-                    } else {
-                        outputText += "Unknown command. Try: list repos, create repo <name>"
-                    }
-                    commandInput = ""
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6E40C9))
-            ) {
+            Button(onClick = {
+                if (commandInput.isBlank()) return@Button
+                val cmd = commandInput.lowercase()
+                outputText = "> $commandInput\n"
+                if (cmd.contains("list repos")) {
+                    outputText += GitHubApiService.executeRequest(token, "/user/repos?per_page=10")
+                } else if (cmd.contains("create repo")) {
+                    val name = commandInput.removePrefix("create repo").trim()
+                    outputText += GitHubApiService.createRepo(token, name, "", false)
+                } else {
+                    outputText += "Unknown command. Try: list repos, create repo <name>"
+                }
+                commandInput = ""
+            }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6E40C9))) {
                 Text("Run", color = Color.White)
             }
         }
