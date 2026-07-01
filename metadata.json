@@ -1,0 +1,6 @@
+{
+  "name": "Dao",
+  "description": "An elegant ChatGPT-style AI chat experience named Dao, themed around Yin-Yang philosophy with game-like balance mechanics and rich animations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
