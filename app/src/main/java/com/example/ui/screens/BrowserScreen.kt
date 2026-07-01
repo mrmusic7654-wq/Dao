@@ -1,5 +1,3 @@
-// /workspace/app/src/main/java/com/example/ui/screens/BrowserScreen.kt
-
 package com.example.ui.screens
 
 import android.Manifest
@@ -43,10 +41,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.example.ui.theme.*
-import kotlinx.coroutines.launch
 import java.io.File
 import java.net.URLDecoder
-import java.text.SimpleDateFormat
 import java.util.*
 
 // ==================== DATA MODELS ====================
@@ -116,6 +112,27 @@ object DaoStorageHelper {
     fun getVideoFilePath(context: Context, fileName: String): File {
         return File(getVideosDir(context), sanitizeFileName(fileName))
     }
+
+    fun extractFileName(url: String, contentDisposition: String?, fallback: String?): String? {
+        if (!contentDisposition.isNullOrBlank()) {
+            val filenameRegex = Regex("filename[^;=\n]*=((['\"]).*?\\2|[^;\n]*)")
+            val match = filenameRegex.find(contentDisposition)
+            if (match != null) {
+                var name = match.groupValues[1].replace("\"", "").trim()
+                try { name = URLDecoder.decode(name, "UTF-8") } catch (_: Exception) {}
+                return name
+            }
+        }
+        try {
+            val urlObj = java.net.URL(url)
+            val path = urlObj.path
+            val lastSegment = path.substringAfterLast("/")
+            if (lastSegment.isNotBlank() && lastSegment.contains(".")) {
+                return URLDecoder.decode(lastSegment, "UTF-8")
+            }
+        } catch (_: Exception) {}
+        return fallback
+    }
 }
 
 // ==================== DOWNLOAD MANAGER ====================
@@ -124,11 +141,8 @@ class DaoDownloadManager(private val context: Context) {
     private val androidDownloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as AndroidDownloadManager
     private val preferences = context.getSharedPreferences("dao_downloads", Context.MODE_PRIVATE)
     
-    // Track downloads
     val activeDownloads = mutableStateListOf<DownloadEntry>()
     private val completedDownloads = mutableStateListOf<DownloadEntry>()
-    
-    // Monitor download progress
     private var isMonitoring = false
     
     fun downloadFile(
@@ -139,16 +153,10 @@ class DaoDownloadManager(private val context: Context) {
         contentDisposition: String? = null,
         isVideo: Boolean = false
     ): Long {
-        // Extract filename from URL or Content-Disposition header
-        val extractedName = extractFileName(url, contentDisposition, fileName) ?: "download_${System.currentTimeMillis()}"
+        val extractedName = DaoStorageHelper.extractFileName(url, contentDisposition, fileName) ?: "download_${System.currentTimeMillis()}"
         val finalFileName = ensureExtension(extractedName, mimeType, isVideo)
         
-        val downloadDir = if (isVideo) {
-            DaoStorageHelper.getVideosDir(context)
-        } else {
-            DaoStorageHelper.getDaoDownloadsDir(context)
-        }
-        
+        val downloadDir = if (isVideo) DaoStorageHelper.getVideosDir(context) else DaoStorageHelper.getDaoDownloadsDir(context)
         val destinationFile = File(downloadDir, finalFileName)
         val destinationUri = Uri.fromFile(destinationFile)
         
@@ -160,142 +168,81 @@ class DaoDownloadManager(private val context: Context) {
             .setAllowedOverMetered(true)
             .setAllowedOverRoaming(true)
         
-        // Set MIME type if available
         mimeType?.let { request.setMimeType(it) }
-        
-        // Add request headers
         userAgent?.let { request.addRequestHeader("User-Agent", it) }
         request.addRequestHeader("Accept", "*/*")
         
         val downloadId = androidDownloadManager.enqueue(request)
         
-        // Track this download
         val entry = DownloadEntry(
-            url = url,
-            fileName = finalFileName,
-            mimeType = mimeType ?: "",
-            downloadId = downloadId,
-            status = DownloadStatus.DOWNLOADING
+            url = url, fileName = finalFileName, mimeType = mimeType ?: "",
+            downloadId = downloadId, status = DownloadStatus.DOWNLOADING
         )
         activeDownloads.add(entry)
-        
-        // Save download info
         saveDownloadInfo(downloadId, finalFileName, url, destinationFile.absolutePath)
-        
-        // Start monitoring if not already
         startMonitoring()
-        
         return downloadId
-    }
-    
-    private fun extractFileName(url: String, contentDisposition: String?, fallback: String?): String? {
-        // Try Content-Disposition header first
-        if (!contentDisposition.isNullOrBlank()) {
-            val filenameRegex = Regex("filename[^;=\n]*=((['\"]).*?\\2|[^;\n]*)")
-            val match = filenameRegex.find(contentDisposition)
-            if (match != null) {
-                var name = match.groupValues[1].replace("\"", "").trim()
-                try {
-                    name = URLDecoder.decode(name, "UTF-8")
-                } catch (_: Exception) {}
-                return name
-            }
-        }
-        
-        // Try extracting from URL
-        try {
-            val urlObj = java.net.URL(url)
-            val path = urlObj.path
-            val lastSegment = path.substringAfterLast("/")
-            if (lastSegment.isNotBlank() && lastSegment.contains(".")) {
-                return URLDecoder.decode(lastSegment, "UTF-8")
-            }
-        } catch (_: Exception) {}
-        
-        return fallback
     }
     
     private fun ensureExtension(fileName: String, mimeType: String?, isVideo: Boolean): String {
         if (fileName.contains(".")) return fileName
-        
         val extension = when {
             isVideo -> ".mp4"
             mimeType != null -> mimeTypeToExtension(mimeType)
             else -> ".bin"
         }
-        
         return "$fileName$extension"
     }
     
-    private fun mimeTypeToExtension(mimeType: String): String {
-        return when {
-            mimeType.contains("video/mp4") -> ".mp4"
-            mimeType.contains("video/webm") -> ".webm"
-            mimeType.contains("video/") -> ".mp4"
-            mimeType.contains("audio/") -> ".mp3"
-            mimeType.contains("image/jpeg") -> ".jpg"
-            mimeType.contains("image/png") -> ".png"
-            mimeType.contains("image/gif") -> ".gif"
-            mimeType.contains("image/webp") -> ".webp"
-            mimeType.contains("application/pdf") -> ".pdf"
-            mimeType.contains("application/zip") -> ".zip"
-            mimeType.contains("application/vnd.android.package-archive") -> ".apk"
-            mimeType.contains("text/html") -> ".html"
-            else -> ".bin"
-        }
+    private fun mimeTypeToExtension(mimeType: String): String = when {
+        mimeType.contains("video/mp4") -> ".mp4"
+        mimeType.contains("video/webm") -> ".webm"
+        mimeType.contains("video/") -> ".mp4"
+        mimeType.contains("audio/") -> ".mp3"
+        mimeType.contains("image/jpeg") -> ".jpg"
+        mimeType.contains("image/png") -> ".png"
+        mimeType.contains("image/gif") -> ".gif"
+        mimeType.contains("image/webp") -> ".webp"
+        mimeType.contains("application/pdf") -> ".pdf"
+        mimeType.contains("application/zip") -> ".zip"
+        mimeType.contains("application/vnd.android.package-archive") -> ".apk"
+        mimeType.contains("text/html") -> ".html"
+        else -> ".bin"
     }
     
     private fun startMonitoring() {
         if (isMonitoring) return
         isMonitoring = true
-        
         Thread {
             while (activeDownloads.isNotEmpty()) {
                 val toRemove = mutableListOf<DownloadEntry>()
-                
-                activeDownloads.forEachIndexed { index, download ->
+                for (i in activeDownloads.indices) {
+                    val download = activeDownloads[i]
                     if (download.status != DownloadStatus.COMPLETE && download.status != DownloadStatus.FAILED) {
                         val query = AndroidDownloadManager.Query().setFilterById(download.downloadId)
                         val cursor = androidDownloadManager.query(query)
-                        
                         if (cursor.moveToFirst()) {
-                            val statusIndex = cursor.getColumnIndex(AndroidDownloadManager.COLUMN_STATUS)
-                            val progressIndex = cursor.getColumnIndex(AndroidDownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
-                            val totalIndex = cursor.getColumnIndex(AndroidDownloadManager.COLUMN_TOTAL_SIZE_BYTES)
-                            
-                            val status = cursor.getInt(statusIndex)
-                            val bytesDownloaded = cursor.getLong(progressIndex)
-                            val totalBytes = cursor.getLong(totalIndex)
-                            
+                            val statusIdx = cursor.getColumnIndex(AndroidDownloadManager.COLUMN_STATUS)
+                            val progressIdx = cursor.getColumnIndex(AndroidDownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                            val totalIdx = cursor.getColumnIndex(AndroidDownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+                            val status = cursor.getInt(statusIdx)
+                            val bytesDownloaded = cursor.getLong(progressIdx)
+                            val totalBytes = cursor.getLong(totalIdx)
                             when (status) {
                                 AndroidDownloadManager.STATUS_SUCCESSFUL -> {
-                                    activeDownloads[index] = download.copy(
-                                        progress = 100,
-                                        status = DownloadStatus.COMPLETE,
-                                        fileSize = totalBytes
-                                    )
-                                    toRemove.add(activeDownloads[index])
+                                    activeDownloads[i] = download.copy(progress = 100, status = DownloadStatus.COMPLETE, fileSize = totalBytes)
+                                    toRemove.add(activeDownloads[i])
                                 }
                                 AndroidDownloadManager.STATUS_FAILED -> {
-                                    activeDownloads[index] = download.copy(
-                                        status = DownloadStatus.FAILED
-                                    )
-                                    toRemove.add(activeDownloads[index])
+                                    activeDownloads[i] = download.copy(status = DownloadStatus.FAILED)
+                                    toRemove.add(activeDownloads[i])
                                 }
                                 AndroidDownloadManager.STATUS_RUNNING -> {
-                                    val progress = if (totalBytes > 0) {
-                                        ((bytesDownloaded * 100) / totalBytes).toInt()
-                                    } else 0
-                                    activeDownloads[index] = download.copy(
-                                        progress = progress,
-                                        fileSize = totalBytes,
-                                        status = DownloadStatus.DOWNLOADING
-                                    )
+                                    val progress = if (totalBytes > 0) ((bytesDownloaded * 100) / totalBytes).toInt() else 0
+                                    activeDownloads[i] = download.copy(progress = progress, fileSize = totalBytes, status = DownloadStatus.DOWNLOADING)
                                 }
                                 AndroidDownloadManager.STATUS_PAUSED -> {
-                                    activeDownloads[index] = download.copy(
-                                        status = DownloadStatus.PAUSED
-                                    )
+                                    activeDownloads[i] = download.copy(status = DownloadStatus.PAUSED)
                                 }
                             }
                         }
@@ -304,15 +251,12 @@ class DaoDownloadManager(private val context: Context) {
                         toRemove.add(download)
                     }
                 }
-                
-                // Move completed downloads to history
-                toRemove.forEach { download ->
-                    if (download.status == DownloadStatus.COMPLETE || download.status == DownloadStatus.FAILED) {
-                        completedDownloads.add(download)
-                        activeDownloads.remove(download)
+                toRemove.forEach { d ->
+                    if (d.status == DownloadStatus.COMPLETE || d.status == DownloadStatus.FAILED) {
+                        completedDownloads.add(d)
+                        activeDownloads.remove(d)
                     }
                 }
-                
                 Thread.sleep(500)
             }
             isMonitoring = false
@@ -327,10 +271,7 @@ class DaoDownloadManager(private val context: Context) {
             .apply()
     }
     
-    fun clearCompleted() {
-        completedDownloads.clear()
-    }
-    
+    fun clearCompleted() { completedDownloads.clear() }
     fun getAllCompleted(): List<DownloadEntry> = completedDownloads.toList()
 }
 
@@ -341,19 +282,15 @@ class BookmarkManager(context: Context) {
     
     fun getBookmarks(): List<BookmarkEntry> {
         val bookmarks = mutableListOf<BookmarkEntry>()
-        val all = prefs.all
-        all.forEach { (key, value) ->
+        prefs.all.forEach { (key, value) ->
             if (key.startsWith("bookmark_")) {
                 val parts = (value as String).split("|||")
                 if (parts.size >= 2) {
-                    bookmarks.add(
-                        BookmarkEntry(
-                            id = key.removePrefix("bookmark_").toLongOrNull() ?: System.nanoTime(),
-                            title = parts[0],
-                            url = parts[1],
-                            createdAt = parts.getOrNull(2)?.toLongOrNull() ?: System.currentTimeMillis()
-                        )
-                    )
+                    bookmarks.add(BookmarkEntry(
+                        id = key.removePrefix("bookmark_").toLongOrNull() ?: System.nanoTime(),
+                        title = parts[0], url = parts[1],
+                        createdAt = parts.getOrNull(2)?.toLongOrNull() ?: System.currentTimeMillis()
+                    ))
                 }
             }
         }
@@ -362,26 +299,16 @@ class BookmarkManager(context: Context) {
     
     fun addBookmark(title: String, url: String) {
         val id = System.nanoTime()
-        prefs.edit()
-            .putString("bookmark_$id", "$title|||$url|||${System.currentTimeMillis()}")
-            .apply()
+        prefs.edit().putString("bookmark_$id", "$title|||$url|||${System.currentTimeMillis()}").apply()
     }
     
-    fun removeBookmark(id: Long) {
-        prefs.edit().remove("bookmark_$id").apply()
-    }
+    fun removeBookmark(id: Long) { prefs.edit().remove("bookmark_$id").apply() }
     
-    fun isBookmarked(url: String): Boolean {
-        return getBookmarks().any { it.url == url }
-    }
+    fun isBookmarked(url: String): Boolean = getBookmarks().any { it.url == url }
     
     fun toggleBookmark(title: String, url: String) {
         val existing = getBookmarks().find { it.url == url }
-        if (existing != null) {
-            removeBookmark(existing.id)
-        } else {
-            addBookmark(title, url)
-        }
+        if (existing != null) removeBookmark(existing.id) else addBookmark(title, url)
     }
 }
 
@@ -390,41 +317,49 @@ class BookmarkManager(context: Context) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BrowserScreen(
-    initialUrl: String = "https://www.google.com",
-    modifier: Modifier = Modifier
+    isDark: Boolean,
+    onMenuClick: () -> Unit
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
-    val scope = rememberCoroutineScope()
     
-    // State
     val downloadManager = remember { DaoDownloadManager(context) }
     val bookmarkManager = remember { BookmarkManager(context) }
     
-    var tabs = remember { mutableStateListOf(BrowserTab(url = initialUrl)) }
+    var tabs = remember { mutableStateListOf(BrowserTab(url = "https://www.google.com")) }
     var activeTabIndex by remember { mutableIntStateOf(0) }
-    var urlInput by remember { mutableStateOf(initialUrl) }
+    var urlInput by remember { mutableStateOf("https://www.google.com") }
     var showTabs by remember { mutableStateOf(false) }
     var showBookmarks by remember { mutableStateOf(false) }
     var showDownloads by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
     
-    // Active tab state
-    val activeTab get() = tabs.getOrNull(activeTabIndex)
+    val activeTab: BrowserTab? get() = tabs.getOrNull(activeTabIndex)
     var isLoading by remember { mutableStateOf(false) }
     var loadProgress by remember { mutableIntStateOf(0) }
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
     var currentTitle by remember { mutableStateOf("New Tab") }
+    var currentUrl by remember { mutableStateOf("https://www.google.com") }
     
-    // WebView reference
     var webView by remember { mutableStateOf<WebView?>(null) }
+    
+    // History tracking
+    var history by remember { mutableStateOf(listOf<Pair<String, String>>()) }
+    
+    // Night mode for web pages
+    var isNightMode by remember { mutableStateOf(false) }
+    
+    // Ad blocking (basic)
+    var isAdBlockEnabled by remember { mutableStateOf(true) }
     
     // Sync URL input when tab changes
     LaunchedEffect(activeTabIndex) {
         activeTab?.let {
             urlInput = it.url
             currentTitle = it.title
+            currentUrl = it.url
         }
     }
     
@@ -438,37 +373,33 @@ fun BrowserScreen(
         }
     }
     
-    // Request storage permission if needed
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
             val needsPermission = ContextCompat.checkSelfPermission(
                 context, Manifest.permission.WRITE_EXTERNAL_STORAGE
             ) != PackageManager.PERMISSION_GRANTED
-            
             if (needsPermission) {
                 storagePermissionLauncher.launch(
-                    arrayOf(
-                        Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                        Manifest.permission.READ_EXTERNAL_STORAGE
-                    )
+                    arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE)
                 )
             }
         }
     }
     
     // ==================== UI ====================
-    Column(modifier = modifier.fillMaxSize().background(YinBlack)) {
+    Column(modifier = Modifier.fillMaxSize().background(YinBlack)) {
         
-        // --- TOP BAR (Browser Chrome) ---
+        // --- TOP BAR ---
         BrowserTopBar(
             urlInput = urlInput,
             onUrlInputChange = { urlInput = it },
             onUrlSubmit = { url ->
                 val fullUrl = if (!url.startsWith("http://") && !url.startsWith("https://")) {
-                    if (url.contains(".") && !url.contains(" ")) "https://$url" 
+                    if (url.contains(".") && !url.contains(" ")) "https://$url"
                     else "https://www.google.com/search?q=${url.replace(" ", "+")}"
                 } else url
                 urlInput = fullUrl
+                currentUrl = fullUrl
                 webView?.loadUrl(fullUrl)
                 focusManager.clearFocus()
             },
@@ -482,11 +413,13 @@ fun BrowserScreen(
             onStop = { webView?.stopLoading() },
             onHome = {
                 urlInput = "https://www.google.com"
+                currentUrl = "https://www.google.com"
                 webView?.loadUrl("https://www.google.com")
             },
             onTabs = { showTabs = true },
             onBookmarks = { showBookmarks = true },
             onDownloads = { showDownloads = true },
+            onHistory = { showHistory = true },
             onMenu = { showMenu = true },
             tabCount = tabs.size,
             currentTitle = currentTitle
@@ -523,11 +456,12 @@ fun BrowserScreen(
                             allowUniversalAccessFromFileURLs = true
                             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                             userAgentString = "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                            cacheMode = WebSettings.LOAD_DEFAULT
                         }
                         
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                                url?.let { urlInput = it }
+                                url?.let { urlInput = it; currentUrl = it }
                                 isLoading = true
                                 loadProgress = 0
                             }
@@ -537,23 +471,27 @@ fun BrowserScreen(
                                 currentTitle = view?.title ?: "Web Page"
                                 canGoBack = view?.canGoBack() ?: false
                                 canGoForward = view?.canGoForward() ?: false
-                                
-                                // Update active tab info
-                                val tab = tabs.getOrNull(activeTabIndex)
-                                if (tab != null && url != null) {
-                                    tabs[activeTabIndex] = tab.copy(
-                                        url = url,
-                                        title = view?.title ?: url,
-                                        webView = view
-                                    )
+                                url?.let {
+                                    currentUrl = it
+                                    urlInput = it
+                                    val tab = tabs.getOrNull(activeTabIndex)
+                                    if (tab != null) {
+                                        tabs[activeTabIndex] = tab.copy(url = it, title = view?.title ?: it, webView = view)
+                                    }
+                                    // Add to history
+                                    history = (history + Pair(view?.title ?: it, it)).takeLast(100)
+                                }
+                                // Inject night mode CSS if enabled
+                                if (isNightMode) {
+                                    injectNightMode(view)
+                                }
+                                // Inject ad blocking if enabled
+                                if (isAdBlockEnabled) {
+                                    injectAdBlock(view)
                                 }
                             }
                             
-                            override fun onReceivedError(
-                                view: WebView?,
-                                request: WebResourceRequest?,
-                                error: WebResourceError?
-                            ) {
+                            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                                 isLoading = false
                             }
                         }
@@ -562,39 +500,31 @@ fun BrowserScreen(
                             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                                 loadProgress = newProgress
                             }
-                            
                             override fun onReceivedTitle(view: WebView?, title: String?) {
                                 currentTitle = title ?: "Web Page"
                             }
                         }
                         
-                        downloadListener = DownloadListener { downloadUrl, userAgent, contentDisposition, mimeType, contentLength ->
+                        setDownloadListener { downloadUrl, userAgent, contentDisposition, mimeType, contentLength ->
                             val isVideo = mimeType?.startsWith("video/") == true ||
                                     downloadUrl.contains(Regex("\\.(mp4|webm|mkv|avi|mov|flv|3gp)(\\?.*)?$"))
-                            
                             val fileName = DaoStorageHelper.extractFileName(downloadUrl, contentDisposition, null)
                             val friendlyName = fileName ?: "download"
-                            
                             downloadManager.downloadFile(
-                                url = downloadUrl,
-                                fileName = friendlyName,
-                                mimeType = mimeType,
-                                userAgent = userAgent,
-                                contentDisposition = contentDisposition,
-                                isVideo = isVideo
+                                url = downloadUrl, fileName = friendlyName, mimeType = mimeType,
+                                userAgent = userAgent, contentDisposition = contentDisposition, isVideo = isVideo
                             )
-                            
                             Toast.makeText(context, "Downloading: $friendlyName", Toast.LENGTH_SHORT).show()
                         }
                         
-                        loadUrl(initialUrl)
+                        loadUrl("https://www.google.com")
                         webView = this
                     }
                 },
                 modifier = Modifier.fillMaxSize()
             )
             
-            // Floating video download button (appears on pages with videos)
+            // Floating video download button
             FloatingVideoDetector(
                 webView = webView,
                 downloadManager = downloadManager,
@@ -602,18 +532,17 @@ fun BrowserScreen(
             )
         }
         
-        // --- BOTTOM BAR (Quick Actions) ---
+        // --- BOTTOM BAR ---
         BrowserBottomBar(
             onShare = {
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, activeTab?.url ?: "")
+                    putExtra(Intent.EXTRA_TEXT, currentUrl)
                     putExtra(Intent.EXTRA_SUBJECT, currentTitle)
                 }
                 context.startActivity(Intent.createChooser(shareIntent, "Share via"))
             },
             onFind = {
-                // Trigger find in page
                 webView?.findAllAsync("")
                 webView?.findNext(true)
             },
@@ -623,15 +552,21 @@ fun BrowserScreen(
                 webView?.reload()
                 Toast.makeText(context, "Desktop mode enabled", Toast.LENGTH_SHORT).show()
             },
-            onBookmarkToggle = {
-                bookmarkManager.toggleBookmark(currentTitle, activeTab?.url ?: "")
-                Toast.makeText(
-                    context,
-                    if (bookmarkManager.isBookmarked(activeTab?.url ?: "")) "Bookmarked!" else "Removed bookmark",
-                    Toast.LENGTH_SHORT
-                ).show()
+            onNightMode = {
+                isNightMode = !isNightMode
+                if (isNightMode) {
+                    injectNightMode(webView)
+                } else {
+                    webView?.reload()
+                }
+                Toast.makeText(context, if (isNightMode) "Night mode ON" else "Night mode OFF", Toast.LENGTH_SHORT).show()
             },
-            isBookmarked = bookmarkManager.isBookmarked(activeTab?.url ?: "")
+            onBookmarkToggle = {
+                bookmarkManager.toggleBookmark(currentTitle, currentUrl)
+                Toast.makeText(context, if (bookmarkManager.isBookmarked(currentUrl)) "Bookmarked!" else "Removed bookmark", Toast.LENGTH_SHORT).show()
+            },
+            isBookmarked = bookmarkManager.isBookmarked(currentUrl),
+            isNightMode = isNightMode
         )
     }
     
@@ -642,16 +577,13 @@ fun BrowserScreen(
         AlertDialog(
             onDismissRequest = { showTabs = false },
             title = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("Tabs (${tabs.size})", fontFamily = FontFamily.Serif, color = ZenGold)
                     TextButton(onClick = {
                         tabs.add(BrowserTab(url = "https://www.google.com"))
                         activeTabIndex = tabs.size - 1
                         urlInput = "https://www.google.com"
+                        currentUrl = "https://www.google.com"
                     }) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = ZenGold, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
@@ -660,56 +592,31 @@ fun BrowserScreen(
                 }
             },
             text = {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)
-                ) {
+                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
                     items(tabs.size) { index ->
                         val tab = tabs[index]
                         Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 2.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    activeTabIndex = index
-                                    urlInput = tab.url
-                                    showTabs = false
-                                    // Restore or reload
-                                    tab.webView?.let { webView = it }
-                                },
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp).clip(RoundedCornerShape(8.dp)).clickable {
+                                activeTabIndex = index
+                                urlInput = tab.url
+                                currentUrl = tab.url
+                                showTabs = false
+                                tab.webView?.let { webView = it }
+                            },
                             color = if (index == activeTabIndex) YinCardBg else Color.Transparent
                         ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = tab.title,
-                                        color = YinText,
-                                        fontWeight = if (index == activeTabIndex) FontWeight.Bold else FontWeight.Normal,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = tab.url,
-                                        color = YinTextSecondary,
-                                        fontSize = 11.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    Text(tab.title, color = YinText, fontWeight = if (index == activeTabIndex) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(tab.url, color = YinTextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                                 if (tabs.size > 1) {
-                                    IconButton(
-                                        onClick = {
-                                            if (tabs.size > 1) {
-                                                tabs.removeAt(index)
-                                                if (activeTabIndex >= tabs.size) {
-                                                    activeTabIndex = tabs.size - 1
-                                                }
-                                            }
+                                    IconButton(onClick = {
+                                        if (tabs.size > 1) {
+                                            tabs.removeAt(index)
+                                            if (activeTabIndex >= tabs.size) activeTabIndex = tabs.size - 1
                                         }
-                                    ) {
+                                    }) {
                                         Icon(Icons.Default.Close, contentDescription = "Close tab", tint = ZenRed, modifier = Modifier.size(18.dp))
                                     }
                                 }
@@ -718,11 +625,7 @@ fun BrowserScreen(
                     }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { showTabs = false }) {
-                    Text("Done", color = ZenGold)
-                }
-            },
+            confirmButton = { TextButton(onClick = { showTabs = false }) { Text("Done", color = ZenGold) } },
             containerColor = YinBlack
         )
     }
@@ -730,50 +633,30 @@ fun BrowserScreen(
     // Bookmarks Dialog
     if (showBookmarks) {
         val bookmarks = remember { mutableStateListOf<BookmarkEntry>().also { it.addAll(bookmarkManager.getBookmarks()) } }
-        
         AlertDialog(
             onDismissRequest = { showBookmarks = false },
-            title = {
-                Text("📑 Bookmarks", fontFamily = FontFamily.Serif, color = ZenGold)
-            },
+            title = { Text("📑 Bookmarks", fontFamily = FontFamily.Serif, color = ZenGold) },
             text = {
                 if (bookmarks.isEmpty()) {
                     Text("No bookmarks yet", color = YinTextSecondary)
                 } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)
-                    ) {
+                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
                         items(bookmarks) { bookmark ->
                             Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 2.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        urlInput = bookmark.url
-                                        webView?.loadUrl(bookmark.url)
-                                        showBookmarks = false
-                                    },
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp).clip(RoundedCornerShape(8.dp)).clickable {
+                                    urlInput = bookmark.url
+                                    currentUrl = bookmark.url
+                                    webView?.loadUrl(bookmark.url)
+                                    showBookmarks = false
+                                },
                                 color = Color.Transparent
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
+                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(bookmark.title, color = YinText, fontWeight = FontWeight.Medium)
-                                        Text(
-                                            bookmark.url,
-                                            color = YinTextSecondary,
-                                            fontSize = 11.sp,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
+                                        Text(bookmark.url, color = YinTextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     }
-                                    IconButton(onClick = {
-                                        bookmarkManager.removeBookmark(bookmark.id)
-                                        bookmarks.remove(bookmark)
-                                    }) {
+                                    IconButton(onClick = { bookmarkManager.removeBookmark(bookmark.id); bookmarks.remove(bookmark) }) {
                                         Icon(Icons.Default.Delete, contentDescription = null, tint = ZenRed, modifier = Modifier.size(18.dp))
                                     }
                                 }
@@ -782,11 +665,7 @@ fun BrowserScreen(
                     }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { showBookmarks = false }) {
-                    Text("Close", color = ZenGold)
-                }
-            },
+            confirmButton = { TextButton(onClick = { showBookmarks = false }) { Text("Close", color = ZenGold) } },
             containerColor = YinBlack
         )
     }
@@ -796,72 +675,68 @@ fun BrowserScreen(
         AlertDialog(
             onDismissRequest = { showDownloads = false },
             title = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("⬇ Downloads", fontFamily = FontFamily.Serif, color = ZenGold)
-                    TextButton(onClick = {
-                        downloadManager.clearCompleted()
-                    }) {
+                    TextButton(onClick = { downloadManager.clearCompleted() }) {
                         Text("Clear", color = ZenRed, fontSize = 12.sp)
                     }
                 }
             },
             text = {
                 val allDownloads = downloadManager.activeDownloads.toList() + downloadManager.getAllCompleted()
-                
                 if (allDownloads.isEmpty()) {
                     Text("No downloads yet", color = YinTextSecondary)
                 } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)
-                    ) {
+                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
                         items(allDownloads.reversed()) { download ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                colors = CardDefaults.cardColors(containerColor = YinCardBg)
-                            ) {
+                            Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = YinCardBg)) {
                                 Column(modifier = Modifier.padding(12.dp)) {
-                                    Text(
-                                        text = download.fileName,
-                                        color = YinText,
-                                        fontWeight = FontWeight.Medium,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    Text(download.fileName, color = YinText, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                     Spacer(Modifier.height(4.dp))
-                                    
                                     when (download.status) {
                                         DownloadStatus.DOWNLOADING -> {
-                                            LinearProgressIndicator(
-                                                progress = { download.progress / 100f },
-                                                modifier = Modifier.fillMaxWidth().height(3.dp),
-                                                color = ZenGold,
-                                                trackColor = YinBlack
-                                            )
-                                            Text(
-                                                "${download.progress}%",
-                                                color = YinTextSecondary,
-                                                fontSize = 11.sp
-                                            )
+                                            LinearProgressIndicator(progress = { download.progress / 100f }, modifier = Modifier.fillMaxWidth().height(3.dp), color = ZenGold, trackColor = YinBlack)
+                                            Text("${download.progress}%", color = YinTextSecondary, fontSize = 11.sp)
                                         }
                                         DownloadStatus.COMPLETE -> {
                                             Text("✅ Complete", color = Color(0xFF4CAF50), fontSize = 11.sp)
-                                            if (download.fileSize > 0) {
-                                                Text(
-                                                    formatFileSize(download.fileSize),
-                                                    color = YinTextSecondary,
-                                                    fontSize = 11.sp
-                                                )
-                                            }
+                                            if (download.fileSize > 0) Text(formatFileSize(download.fileSize), color = YinTextSecondary, fontSize = 11.sp)
                                         }
-                                        DownloadStatus.FAILED -> {
-                                            Text("❌ Failed", color = ZenRed, fontSize = 11.sp)
-                                        }
-                                        DownloadStatus.PAUSED -> {
-                                            Text("⏸ Paused", color = YinTextSecondary, fontSize = 11.sp)
-                                        }
+                                        DownloadStatus.FAILED -> Text("❌ Failed", color = ZenRed, fontSize = 11.sp)
+                                        DownloadStatus.PAUSED -> Text("⏸ Paused", color = YinTextSecondary, fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showDownloads = false }) { Text("Close", color = ZenGold) } },
+            containerColor = YinBlack
+        )
+    }
+    
+    // History Dialog (NEW)
+    if (showHistory) {
+        AlertDialog(
+            onDismissRequest = { showHistory = false },
+            title = { Text("🕐 History", fontFamily = FontFamily.Serif, color = ZenGold) },
+            text = {
+                if (history.isEmpty()) {
+                    Text("No history yet", color = YinTextSecondary)
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+                        items(history.reversed()) { (title, url) ->
+                            Surface(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp).clip(RoundedCornerShape(8.dp)).clickable {
+                                    urlInput = url; currentUrl = url; webView?.loadUrl(url); showHistory = false
+                                },
+                                color = Color.Transparent
+                            ) {
+                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(title.ifBlank { url }, color = YinText, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(url, color = YinTextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     }
                                 }
                             }
@@ -870,8 +745,9 @@ fun BrowserScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showDownloads = false }) {
-                    Text("Close", color = ZenGold)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(onClick = { history = emptyList(); showHistory = false }) { Text("Clear All", color = ZenRed) }
+                    TextButton(onClick = { showHistory = false }) { Text("Close", color = ZenGold) }
                 }
             },
             containerColor = YinBlack
@@ -885,43 +761,71 @@ fun BrowserScreen(
             title = { Text("Browser Menu", fontFamily = FontFamily.Serif, color = ZenGold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    BrowserMenuItem("🔍 Find in Page", onClick = {
-                        webView?.findAllAsync("")
-                        webView?.findNext(true)
-                        showMenu = false
-                    })
-                    BrowserMenuItem("🖥 Request Desktop Site", onClick = {
+                    BrowserMenuItem("🔍 Find in Page") {
+                        webView?.findAllAsync(""); webView?.findNext(true); showMenu = false
+                    }
+                    BrowserMenuItem("🖥 Request Desktop Site") {
                         webView?.settings?.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                        webView?.reload()
+                        webView?.reload(); showMenu = false
+                    }
+                    BrowserMenuItem("📱 Request Mobile Site") {
+                        webView?.settings?.userAgentString = null; webView?.reload(); showMenu = false
+                    }
+                    BrowserMenuItem(if (isNightMode) "☀️ Disable Night Mode" else "🌙 Enable Night Mode") {
+                        isNightMode = !isNightMode
+                        if (isNightMode) injectNightMode(webView) else webView?.reload()
                         showMenu = false
-                    })
-                    BrowserMenuItem("📱 Request Mobile Site", onClick = {
-                        webView?.settings?.userAgentString = null // Reset to default
-                        webView?.reload()
-                        showMenu = false
-                    })
-                    BrowserMenuItem("🗑 Clear Browsing Data", onClick = {
+                    }
+                    BrowserMenuItem(if (isAdBlockEnabled) "📢 Disable Ad Block" else "🛡 Enable Ad Block") {
+                        isAdBlockEnabled = !isAdBlockEnabled
+                        webView?.reload(); showMenu = false
+                    }
+                    BrowserMenuItem("🗑 Clear Browsing Data") {
                         WebStorage.getInstance().deleteAllData()
                         CookieManager.getInstance().removeAllCookies(null)
                         Toast.makeText(context, "Browsing data cleared", Toast.LENGTH_SHORT).show()
                         showMenu = false
-                    })
-                    BrowserMenuItem("🔗 Copy URL", onClick = {
+                    }
+                    BrowserMenuItem("🔗 Copy URL") {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("URL", activeTab?.url ?: ""))
+                        clipboard.setPrimaryClip(ClipData.newPlainText("URL", currentUrl))
                         Toast.makeText(context, "URL copied", Toast.LENGTH_SHORT).show()
                         showMenu = false
-                    })
+                    }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { showMenu = false }) {
-                    Text("Close", color = ZenGold)
-                }
-            },
+            confirmButton = { TextButton(onClick = { showMenu = false }) { Text("Close", color = ZenGold) } },
             containerColor = YinBlack
         )
     }
+}
+
+// ==================== INJECTION HELPERS ====================
+
+private fun injectNightMode(webView: WebView?) {
+    webView?.evaluateJavascript("""
+        (function() {
+            var css = 'html { filter: invert(1) hue-rotate(180deg) brightness(0.9); } img, video, canvas { filter: invert(1) hue-rotate(180deg) brightness(1.1); }';
+            var style = document.getElementById('dao-night-mode');
+            if (!style) {
+                style = document.createElement('style');
+                style.id = 'dao-night-mode';
+                style.innerHTML = css;
+                document.head.appendChild(style);
+            }
+        })();
+    """.trimIndent(), null)
+}
+
+private fun injectAdBlock(webView: WebView?) {
+    webView?.evaluateJavascript("""
+        (function() {
+            var adSelectors = ['.ad', '.ads', '.advertisement', '[id*="google_ads"]', '[class*="ad-"]', 'iframe[src*="doubleclick"]', 'iframe[src*="ads"]'];
+            adSelectors.forEach(function(sel) {
+                try { document.querySelectorAll(sel).forEach(function(el) { el.style.display = 'none'; }); } catch(e) {}
+            });
+        })();
+    """.trimIndent(), null)
 }
 
 // ==================== SUB-COMPOSABLES ====================
@@ -943,159 +847,64 @@ private fun BrowserTopBar(
     onTabs: () -> Unit,
     onBookmarks: () -> Unit,
     onDownloads: () -> Unit,
+    onHistory: () -> Unit,
     onMenu: () -> Unit,
     tabCount: Int,
     currentTitle: String
 ) {
-    Surface(
-        color = YinCardBg,
-        shadowElevation = 2.dp
-    ) {
+    Surface(color = YinCardBg, shadowElevation = 2.dp) {
         Column {
-            // Navigation buttons row
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Back
-                IconButton(
-                    onClick = onBack,
-                    enabled = canGoBack
-                ) {
-                    Icon(
-                        Icons.Default.ArrowBack,
-                        contentDescription = "Back",
-                        tint = if (canGoBack) YinText else YinTextSecondary.copy(alpha = 0.4f),
-                        modifier = Modifier.size(22.dp)
-                    )
+                IconButton(onClick = onBack, enabled = canGoBack) {
+                    Icon(Icons.Default.ArrowBack, "Back", tint = if (canGoBack) YinText else YinTextSecondary.copy(alpha = 0.4f), modifier = Modifier.size(22.dp))
                 }
-                
-                // Forward
-                IconButton(
-                    onClick = onForward,
-                    enabled = canGoForward
-                ) {
-                    Icon(
-                        Icons.Default.ArrowForward,
-                        contentDescription = "Forward",
-                        tint = if (canGoForward) YinText else YinTextSecondary.copy(alpha = 0.4f),
-                        modifier = Modifier.size(22.dp)
-                    )
+                IconButton(onClick = onForward, enabled = canGoForward) {
+                    Icon(Icons.Default.ArrowForward, "Forward", tint = if (canGoForward) YinText else YinTextSecondary.copy(alpha = 0.4f), modifier = Modifier.size(22.dp))
                 }
-                
-                // Refresh / Stop
-                IconButton(
-                    onClick = if (isLoading) onStop else onRefresh
-                ) {
-                    Icon(
-                        if (isLoading) Icons.Default.Close else Icons.Default.Refresh,
-                        contentDescription = if (isLoading) "Stop" else "Refresh",
-                        tint = YinText,
-                        modifier = Modifier.size(22.dp)
-                    )
+                IconButton(onClick = if (isLoading) onStop else onRefresh) {
+                    Icon(if (isLoading) Icons.Default.Close else Icons.Default.Refresh, if (isLoading) "Stop" else "Refresh", tint = YinText, modifier = Modifier.size(22.dp))
                 }
-                
-                // Home
                 IconButton(onClick = onHome) {
-                    Icon(
-                        Icons.Default.Home,
-                        contentDescription = "Home",
-                        tint = ZenGold,
-                        modifier = Modifier.size(22.dp)
-                    )
+                    Icon(Icons.Default.Home, "Home", tint = ZenGold, modifier = Modifier.size(22.dp))
                 }
                 
                 Spacer(Modifier.width(4.dp))
                 
-                // URL Bar                OutlinedTextField(
+                // URL Bar
+                OutlinedTextField(
                     value = urlInput,
                     onValueChange = onUrlInputChange,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(42.dp),
+                    modifier = Modifier.weight(1f).height(42.dp),
                     singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(
-                        fontSize = 13.sp,
-                        color = YinText,
-                        fontFamily = FontFamily.Monospace
-                    ),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = YinText, fontFamily = FontFamily.Monospace),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = ZenGold,
-                        unfocusedBorderColor = Color(0xFF333340),
-                        cursorColor = ZenGold,
-                        focusedContainerColor = Color(0xFF1A1A22),
-                        unfocusedContainerColor = Color(0xFF1A1A22)
+                        focusedBorderColor = ZenGold, unfocusedBorderColor = Color(0xFF333340),
+                        cursorColor = ZenGold, focusedContainerColor = Color(0xFF1A1A22), unfocusedContainerColor = Color(0xFF1A1A22)
                     ),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Uri,
-                        imeAction = ImeAction.Go
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onGo = { onUrlSubmit(urlInput) }
-                    ),
-                    placeholder = {
-                        Text(
-                            "Search or enter URL",
-                            color = YinTextSecondary.copy(alpha = 0.5f),
-                            fontSize = 12.sp
-                        )
-                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+                    keyboardActions = KeyboardActions(onGo = { onUrlSubmit(urlInput) }),
+                    placeholder = { Text("Search or enter URL", color = YinTextSecondary.copy(alpha = 0.5f), fontSize = 12.sp) },
                     shape = RoundedCornerShape(8.dp)
                 )
                 
                 Spacer(Modifier.width(4.dp))
                 
-                // Tabs button
                 Box {
-                    IconButton(onClick = onTabs) {
-                        Icon(
-                            Icons.Default.Tab,
-                            contentDescription = "Tabs",
-                            tint = YinText,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
+                    IconButton(onClick = onTabs) { Icon(Icons.Default.Tab, "Tabs", tint = YinText, modifier = Modifier.size(22.dp)) }
                     if (tabCount > 0) {
-                        Badge(
-                            modifier = Modifier.align(Alignment.TopEnd).offset(x = (-4).dp, y = 4.dp),
-                            containerColor = ZenGold
-                        ) {
+                        Badge(modifier = Modifier.align(Alignment.TopEnd).offset(x = (-4).dp, y = 4.dp), containerColor = ZenGold) {
                             Text("$tabCount", fontSize = 9.sp, color = YinBlack)
                         }
                     }
                 }
                 
-                // Bookmarks
-                IconButton(onClick = onBookmarks) {
-                    Icon(
-                        Icons.Default.Bookmark,
-                        contentDescription = "Bookmarks",
-                        tint = ZenGold,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                
-                // Downloads
-                IconButton(onClick = onDownloads) {
-                    Icon(
-                        Icons.Default.Download,
-                        contentDescription = "Downloads",
-                        tint = ZenBlue,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                
-                // More menu
-                IconButton(onClick = onMenu) {
-                    Icon(
-                        Icons.Default.MoreVert,
-                        contentDescription = "Menu",
-                        tint = YinText,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+                IconButton(onClick = onBookmarks) { Icon(Icons.Default.Bookmark, "Bookmarks", tint = ZenGold, modifier = Modifier.size(22.dp)) }
+                IconButton(onClick = onDownloads) { Icon(Icons.Default.Download, "Downloads", tint = ZenBlue, modifier = Modifier.size(22.dp)) }
+                IconButton(onClick = onHistory) { Icon(Icons.Default.History, "History", tint = ZenSienna, modifier = Modifier.size(22.dp)) }
+                IconButton(onClick = onMenu) { Icon(Icons.Default.MoreVert, "Menu", tint = YinText, modifier = Modifier.size(22.dp)) }
             }
         }
     }
@@ -1106,26 +915,28 @@ private fun BrowserBottomBar(
     onShare: () -> Unit,
     onFind: () -> Unit,
     onDesktopMode: () -> Unit,
+    onNightMode: () -> Unit,
     onBookmarkToggle: () -> Unit,
-    isBookmarked: Boolean
+    isBookmarked: Boolean,
+    isNightMode: Boolean
 ) {
-    Surface(
-        color = YinCardBg,
-        shadowElevation = 2.dp
-    ) {
+    Surface(color = YinCardBg, shadowElevation = 2.dp) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            BottomBarButton(icon = Icons.Default.Share, label = "Share", onClick = onShare)
-            BottomBarButton(icon = Icons.Default.Search, label = "Find", onClick = onFind)
-            BottomBarButton(icon = Icons.Default.DesktopWindows, label = "Desktop", onClick = onDesktopMode)
+            BottomBarButton(Icons.Default.Share, "Share", onClick = onShare)
+            BottomBarButton(Icons.Default.Search, "Find", onClick = onFind)
+            BottomBarButton(Icons.Default.DesktopWindows, "Desktop", onClick = onDesktopMode)
             BottomBarButton(
-                icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                label = if (isBookmarked) "Saved" else "Bookmark",
+                if (isNightMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                if (isNightMode) "Light" else "Dark",
+                onClick = onNightMode
+            )
+            BottomBarButton(
+                if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                if (isBookmarked) "Saved" else "Save",
                 onClick = onBookmarkToggle,
                 tint = if (isBookmarked) ZenGold else YinTextSecondary
             )
@@ -1142,10 +953,7 @@ private fun BottomBarButton(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
         Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(18.dp))
         Text(label, color = tint, fontSize = 10.sp)
@@ -1155,18 +963,10 @@ private fun BottomBarButton(
 @Composable
 private fun BrowserMenuItem(text: String, onClick: () -> Unit) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick),
         color = Color.Transparent
     ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(12.dp),
-            color = YinText,
-            fontSize = 14.sp
-        )
+        Text(text, modifier = Modifier.padding(12.dp), color = YinText, fontSize = 14.sp)
     }
 }
 
@@ -1179,14 +979,12 @@ private fun FloatingVideoDetector(
     var showVideoButton by remember { mutableStateOf(false) }
     var videoUrls by remember { mutableStateOf<List<String>>(emptyList()) }
     
-    // Inject JavaScript to detect videos
     LaunchedEffect(webView) {
         webView?.let { view ->
-            // We can add a periodic check or trigger on page load
+            val originalClient = view.webViewClient
             view.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) {
-                    super.onPageFinished(view, url)
-                    // Inject video detection script
+                    originalClient?.onPageFinished(view, url)
                     view.evaluateJavascript("""
                         (function() {
                             var videos = [];
@@ -1202,13 +1000,8 @@ private fun FloatingVideoDetector(
                             if (!parsed.isNullOrBlank() && parsed != "null" && parsed != "[]") {
                                 val urls = org.json.JSONArray(parsed)
                                 val list = mutableListOf<String>()
-                                for (i in 0 until urls.length()) {
-                                    list.add(urls.getString(i))
-                                }
-                                if (list.isNotEmpty()) {
-                                    videoUrls = list
-                                    showVideoButton = true
-                                }
+                                for (i in 0 until urls.length()) list.add(urls.getString(i))
+                                if (list.isNotEmpty()) { videoUrls = list; showVideoButton = true }
                             }
                         } catch (_: Exception) {}
                     }
@@ -1217,69 +1010,31 @@ private fun FloatingVideoDetector(
         }
     }
     
-    // Floating action button for video download
     AnimatedVisibility(
         visible = showVideoButton && videoUrls.isNotEmpty(),
         enter = fadeIn() + scaleIn(),
-        exit = fadeOut() + scaleOut(),
-        modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+        exit = fadeOut() + scaleOut()
     ) {
         FloatingActionButton(
             onClick = {
                 videoUrls.forEach { videoUrl ->
-                    val fileName = "video_${System.currentTimeMillis()}.mp4"
-                    downloadManager.downloadFile(
-                        url = videoUrl,
-                        fileName = fileName,
-                        isVideo = true
-                    )
+                    downloadManager.downloadFile(url = videoUrl, fileName = "video_${System.currentTimeMillis()}.mp4", isVideo = true)
                     Toast.makeText(context, "Downloading video...", Toast.LENGTH_SHORT).show()
                 }
                 showVideoButton = false
             },
             containerColor = ZenRed,
-            contentColor = Color.White
+            contentColor = Color.White,
+            modifier = Modifier.padding(16.dp)
         ) {
             Icon(Icons.Default.VideoFile, contentDescription = "Download Video")
         }
     }
 }
 
-// ==================== UTILITY FUNCTIONS ====================
-
-private fun formatFileSize(bytes: Long): String {
-    return when {
-        bytes < 1024 -> "$bytes B"
-        bytes < 1024 * 1024 -> "${bytes / 1024} KB"
-        bytes < 1024 * 1024 * 1024 -> "${"%.1f".format(bytes / (1024.0 * 1024.0))} MB"
-        else -> "${"%.2f".format(bytes / (1024.0 * 1024.0 * 1024.0))} GB"
-    }
-}
-
-// Extension for DaoStorageHelper
-private fun DaoStorageHelper.Companion.extractFileName(
-    url: String, 
-    contentDisposition: String?, 
-    fallback: String?
-): String? {
-    if (!contentDisposition.isNullOrBlank()) {
-        val filenameRegex = Regex("filename[^;=\n]*=((['\"]).*?\\2|[^;\n]*)")
-        val match = filenameRegex.find(contentDisposition)
-        if (match != null) {
-            var name = match.groupValues[1].replace("\"", "").trim()
-            try {
-                name = URLDecoder.decode(name, "UTF-8")
-            } catch (_: Exception) {}
-            return name
-        }
-    }
-    try {
-        val urlObj = java.net.URL(url)
-        val path = urlObj.path
-        val lastSegment = path.substringAfterLast("/")
-        if (lastSegment.isNotBlank() && lastSegment.contains(".")) {
-            return URLDecoder.decode(lastSegment, "UTF-8")
-        }
-    } catch (_: Exception) {}
-    return fallback
+private fun formatFileSize(bytes: Long): String = when {
+    bytes < 1024 -> "$bytes B"
+    bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+    bytes < 1024 * 1024 * 1024 -> "${"%.1f".format(bytes / (1024.0 * 1024.0))} MB"
+    else -> "${"%.2f".format(bytes / (1024.0 * 1024.0 * 1024.0))} GB"
 }
