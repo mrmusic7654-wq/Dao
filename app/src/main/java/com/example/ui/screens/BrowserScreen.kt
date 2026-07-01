@@ -389,7 +389,7 @@ class BookmarkManager(context: Context) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DaoBrowserScreen(
+fun BrowserScreen(
     initialUrl: String = "https://www.google.com",
     modifier: Modifier = Modifier
 ) {
