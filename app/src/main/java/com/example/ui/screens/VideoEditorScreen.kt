@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.ui.platform.LocalContext
 import android.Manifest
 import android.content.*
 import android.content.pm.PackageManager
