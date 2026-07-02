@@ -574,7 +574,7 @@ private fun ChatCard(
     telegramBlue: Color
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) telegramBlue.copy(alpha = 0.08f) else YinCardBg
         ),
