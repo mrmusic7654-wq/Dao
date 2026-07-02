@@ -200,122 +200,238 @@ fun FileManagerScreen(
     var editorContent by remember { mutableStateOf("") }
     var isWorking by remember { mutableStateOf(false) }
     var workMessage by remember { mutableStateOf("") }
-
     val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        if (permissions.values.all { it }) refreshFiles(currentPath)
-        else Toast.makeText(context, "Storage permission required", Toast.LENGTH_LONG).show()
-    }
+    ActivityResultContracts.RequestMultiplePermissions()
+) { permissions ->
+    if (permissions.values.all { it }) refreshFiles(currentPath)
+    else Toast.makeText(context, "Storage permission required", Toast.LENGTH_LONG).show()
+}
 
-    LaunchedEffect(Unit) {
-        val permissions = mutableListOf<String>()
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
-                permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
-                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED)
-                permissions.add(Manifest.permission.READ_MEDIA_VIDEO)
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED)
-                permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED)
-                permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
-        }
-        if (permissions.isNotEmpty()) permissionLauncher.launch(permissions.toTypedArray())
-        refreshFiles(currentPath)
-        loadStorageInfo()
-    }
+fun loadStorageInfo() {
+    val internal = Environment.getExternalStorageDirectory()
+    storageInfo = listOf(StorageInfo(
+        path = internal.absolutePath,
+        totalSpace = internal.totalSpace,
+        freeSpace = internal.freeSpace,
+        usedSpace = internal.totalSpace - internal.freeSpace,
+        name = "Internal Storage"
+    ))
+}
 
-    fun loadStorageInfo() {
-        val internal = Environment.getExternalStorageDirectory()
-        storageInfo = listOf(StorageInfo(
-            path = internal.absolutePath,
-            totalSpace = internal.totalSpace,
-            freeSpace = internal.freeSpace,
-            usedSpace = internal.totalSpace - internal.freeSpace,
-            name = "Internal Storage"
-        ))
+fun refreshFiles(path: String) {
+    val dir = File(path)
+    if (!dir.exists() || !dir.isDirectory) return
+    currentPath = path
+    val allFiles = dir.listFiles()?.map { FileItem(it) } ?: emptyList()
+    val filtered = allFiles.filter { file ->
+        (showHidden || !file.isHidden) && (searchQuery.isBlank() || file.name.contains(searchQuery, ignoreCase = true))
     }
-
-    fun refreshFiles(path: String) {
-        val dir = File(path)
-        if (!dir.exists() || !dir.isDirectory) return
-        currentPath = path
-        val allFiles = dir.listFiles()?.map { FileItem(it) } ?: emptyList()
-        val filtered = allFiles.filter { file ->
-            (showHidden || !file.isHidden) && (searchQuery.isBlank() || file.name.contains(searchQuery, ignoreCase = true))
-        }
-        val sorted = when (sortMode) {
-            FileSortMode.NAME -> if (isAscending) filtered.sortedBy { it.name.lowercase() } else filtered.sortedByDescending { it.name.lowercase() }
-            FileSortMode.DATE -> if (isAscending) filtered.sortedBy { it.lastModified } else filtered.sortedByDescending { it.lastModified }
-            FileSortMode.SIZE -> if (isAscending) filtered.sortedBy { it.size } else filtered.sortedByDescending { it.size }
-            FileSortMode.TYPE -> if (isAscending) filtered.sortedBy { it.extension } else filtered.sortedByDescending { it.extension }
-        }
-        filesList = sorted.sortedByDescending { it.isDirectory }
-        selectedFiles = emptySet()
-        isSelectionMode = false
+    val sorted = when (sortMode) {
+        FileSortMode.NAME -> if (isAscending) filtered.sortedBy { it.name.lowercase() } else filtered.sortedByDescending { it.name.lowercase() }
+        FileSortMode.DATE -> if (isAscending) filtered.sortedBy { it.lastModified } else filtered.sortedByDescending { it.lastModified }
+        FileSortMode.SIZE -> if (isAscending) filtered.sortedBy { it.size } else filtered.sortedByDescending { it.size }
+        FileSortMode.TYPE -> if (isAscending) filtered.sortedBy { it.extension } else filtered.sortedByDescending { it.extension }
     }
+    filesList = sorted.sortedByDescending { it.isDirectory }
+    selectedFiles = emptySet()
+    isSelectionMode = false
+}
 
-    fun navigateTo(path: String) = refreshFiles(path)
-    fun navigateUp() {
-        val parent = File(currentPath).parentFile
-        if (parent != null && parent.canRead()) refreshFiles(parent.absolutePath)
+fun navigateTo(path: String) = refreshFiles(path)
+
+fun navigateUp() {
+    val parent = File(currentPath).parentFile
+    if (parent != null && parent.canRead()) refreshFiles(parent.absolutePath)
+}
+
+fun getMimeTypeForFile(extension: String): String = when (extension) {
+    "jpg", "jpeg" -> "image/jpeg"; "png" -> "image/png"; "gif" -> "image/gif"; "webp" -> "image/webp"
+    "mp4" -> "video/mp4"; "mkv" -> "video/x-matroska"; "mp3" -> "audio/mpeg"
+    "pdf" -> "application/pdf"; "apk" -> "application/vnd.android.package-archive"
+    "zip" -> "application/zip"; "txt" -> "text/plain"; "html" -> "text/html"
+    else -> "*/*"
+}
+
+fun handleFileClick(fileItem: FileItem) {
+    if (isSelectionMode) {
+        val path = fileItem.file.absolutePath
+        selectedFiles = if (path in selectedFiles) selectedFiles - path else selectedFiles + path
+        return
     }
-
-    fun handleFileClick(fileItem: FileItem) {
-        if (isSelectionMode) {
-            val path = fileItem.file.absolutePath
-            selectedFiles = if (path in selectedFiles) selectedFiles - path else selectedFiles + path
-            return
-        }
-        if (fileItem.isDirectory) navigateTo(fileItem.file.absolutePath)
-        else {
-            val mime = FileUtils.getMimeType(fileItem.extension)
-            when (mime) {
-                "text", "code" -> {
-                    try { editorContent = fileItem.file.readText(); showTextEditor = fileItem }
-                    catch (e: Exception) { Toast.makeText(context, "Cannot read file", Toast.LENGTH_SHORT).show() }
-                }
-                else -> {
-                    try {
-                        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", fileItem.file)
-                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(uri, getMimeTypeForFile(fileItem.extension))
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        context.startActivity(intent)
-                    } catch (e: Exception) { showFileInfoDialog = fileItem }
-                }
+    if (fileItem.isDirectory) navigateTo(fileItem.file.absolutePath)
+    else {
+        val mime = FileUtils.getMimeType(fileItem.extension)
+        when (mime) {
+            "text", "code" -> {
+                try { editorContent = fileItem.file.readText(); showTextEditor = fileItem }
+                catch (e: Exception) { Toast.makeText(context, "Cannot read file", Toast.LENGTH_SHORT).show() }
+            }
+            else -> {
+                try {
+                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", fileItem.file)
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, getMimeTypeForFile(fileItem.extension))
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) { showFileInfoDialog = fileItem }
             }
         }
     }
+}
 
-    fun getMimeTypeForFile(extension: String): String = when (extension) {
-        "jpg", "jpeg" -> "image/jpeg"; "png" -> "image/png"; "gif" -> "image/gif"; "webp" -> "image/webp"
-        "mp4" -> "video/mp4"; "mkv" -> "video/x-matroska"; "mp3" -> "audio/mpeg"
-        "pdf" -> "application/pdf"; "apk" -> "application/vnd.android.package-archive"
-        "zip" -> "application/zip"; "txt" -> "text/plain"; "html" -> "text/html"
-        else -> "*/*"
-    }
+fun deleteSelected() {
+    var success = true
+    selectedFiles.forEach { path -> if (!FileUtils.deleteRecursive(File(path))) success = false }
+    Toast.makeText(context, if (success) "Deleted successfully" else "Some files couldn't be deleted", Toast.LENGTH_SHORT).show()
+    refreshFiles(currentPath)
+}
 
-    fun deleteSelected() {
-        var success = true
-        selectedFiles.forEach { path -> if (!FileUtils.deleteRecursive(File(path))) success = false }
-        Toast.makeText(context, if (success) "Deleted successfully" else "Some files couldn't be deleted", Toast.LENGTH_SHORT).show()
-        refreshFiles(currentPath)
-    }
+fun compressSelected() {
+    val outputFile = File(File(currentPath), "archive_${System.currentTimeMillis()}.zip")
+    isWorking = true; workMessage = "Compressing..."
+    val success = FileUtils.createZip(File(currentPath), outputFile)
+    isWorking = false
+    Toast.makeText(context, if (success) "Archive created" else "Compression failed", Toast.LENGTH_SHORT).show()
+    if (success) refreshFiles(currentPath)
+}
 
-    fun compressSelected() {
-        val outputFile = File(File(currentPath), "archive_${System.currentTimeMillis()}.zip")
-        isWorking = true; workMessage = "Compressing..."
-        val success = FileUtils.createZip(File(currentPath), outputFile)
-        isWorking = false
-        Toast.makeText(context, if (success) "Archive created: ${outputFile.name}" else "Compression failed", Toast.LENGTH_SHORT).show()
-        if (success) refreshFiles(currentPath)
+LaunchedEffect(Unit) {
+    val permissions = mutableListOf<String>()
+    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
+            permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
+            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED)
+            permissions.add(Manifest.permission.READ_MEDIA_VIDEO)
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED)
+            permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED)
+            permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
+    }
+    if (permissions.isNotEmpty()) permissionLauncher.launch(permissions.toTypedArray())
+    refreshFiles(currentPath)
+    loadStorageInfo()
+}val permissionLauncher = rememberLauncherForActivityResult(
+    ActivityResultContracts.RequestMultiplePermissions()
+) { permissions ->
+    if (permissions.values.all { it }) refreshFiles(currentPath)
+    else Toast.makeText(context, "Storage permission required", Toast.LENGTH_LONG).show()
+}
+
+fun loadStorageInfo() {
+    val internal = Environment.getExternalStorageDirectory()
+    storageInfo = listOf(StorageInfo(
+        path = internal.absolutePath,
+        totalSpace = internal.totalSpace,
+        freeSpace = internal.freeSpace,
+        usedSpace = internal.totalSpace - internal.freeSpace,
+        name = "Internal Storage"
+    ))
+}
+
+fun refreshFiles(path: String) {
+    val dir = File(path)
+    if (!dir.exists() || !dir.isDirectory) return
+    currentPath = path
+    val allFiles = dir.listFiles()?.map { FileItem(it) } ?: emptyList()
+    val filtered = allFiles.filter { file ->
+        (showHidden || !file.isHidden) && (searchQuery.isBlank() || file.name.contains(searchQuery, ignoreCase = true))
+    }
+    val sorted = when (sortMode) {
+        FileSortMode.NAME -> if (isAscending) filtered.sortedBy { it.name.lowercase() } else filtered.sortedByDescending { it.name.lowercase() }
+        FileSortMode.DATE -> if (isAscending) filtered.sortedBy { it.lastModified } else filtered.sortedByDescending { it.lastModified }
+        FileSortMode.SIZE -> if (isAscending) filtered.sortedBy { it.size } else filtered.sortedByDescending { it.size }
+        FileSortMode.TYPE -> if (isAscending) filtered.sortedBy { it.extension } else filtered.sortedByDescending { it.extension }
+    }
+    filesList = sorted.sortedByDescending { it.isDirectory }
+    selectedFiles = emptySet()
+    isSelectionMode = false
+}
+
+fun navigateTo(path: String) = refreshFiles(path)
+
+fun navigateUp() {
+    val parent = File(currentPath).parentFile
+    if (parent != null && parent.canRead()) refreshFiles(parent.absolutePath)
+}
+
+fun getMimeTypeForFile(extension: String): String = when (extension) {
+    "jpg", "jpeg" -> "image/jpeg"; "png" -> "image/png"; "gif" -> "image/gif"; "webp" -> "image/webp"
+    "mp4" -> "video/mp4"; "mkv" -> "video/x-matroska"; "mp3" -> "audio/mpeg"
+    "pdf" -> "application/pdf"; "apk" -> "application/vnd.android.package-archive"
+    "zip" -> "application/zip"; "txt" -> "text/plain"; "html" -> "text/html"
+    else -> "*/*"
+}
+
+fun handleFileClick(fileItem: FileItem) {
+    if (isSelectionMode) {
+        val path = fileItem.file.absolutePath
+        selectedFiles = if (path in selectedFiles) selectedFiles - path else selectedFiles + path
+        return
+    }
+    if (fileItem.isDirectory) navigateTo(fileItem.file.absolutePath)
+    else {
+        val mime = FileUtils.getMimeType(fileItem.extension)
+        when (mime) {
+            "text", "code" -> {
+                try { editorContent = fileItem.file.readText(); showTextEditor = fileItem }
+                catch (e: Exception) { Toast.makeText(context, "Cannot read file", Toast.LENGTH_SHORT).show() }
+            }
+            else -> {
+                try {
+                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", fileItem.file)
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, getMimeTypeForFile(fileItem.extension))
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) { showFileInfoDialog = fileItem }
+            }
+        }
+    }
+}
+
+fun deleteSelected() {
+    var success = true
+    selectedFiles.forEach { path -> if (!FileUtils.deleteRecursive(File(path))) success = false }
+    Toast.makeText(context, if (success) "Deleted successfully" else "Some files couldn't be deleted", Toast.LENGTH_SHORT).show()
+    refreshFiles(currentPath)
+}
+
+fun compressSelected() {
+    val outputFile = File(File(currentPath), "archive_${System.currentTimeMillis()}.zip")
+    isWorking = true; workMessage = "Compressing..."
+    val success = FileUtils.createZip(File(currentPath), outputFile)
+    isWorking = false
+    Toast.makeText(context, if (success) "Archive created" else "Compression failed", Toast.LENGTH_SHORT).show()
+    if (success) refreshFiles(currentPath)
+}
+
+LaunchedEffect(Unit) {
+    val permissions = mutableListOf<String>()
+    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
+            permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
+            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+    }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED)
+            permissions.add(Manifest.permission.READ_MEDIA_VIDEO)
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED)
+            permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED)
+            permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
+    }
+    if (permissions.isNotEmpty()) permissionLauncher.launch(permissions.toTypedArray())
+    refreshFiles(currentPath)
+    loadStorageInfo()
+}
+
 
     // ==================== DIALOGS ====================
 
