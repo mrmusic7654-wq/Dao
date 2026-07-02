@@ -335,34 +335,33 @@ fun BrowserScreen(
     var showMenu by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
     
-    val activeTab: BrowserTab? get() = tabs.getOrNull(activeTabIndex)
     var isLoading by remember { mutableStateOf(false) }
     var loadProgress by remember { mutableIntStateOf(0) }
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
     var currentTitle by remember { mutableStateOf("New Tab") }
     var currentUrl by remember { mutableStateOf("https://www.google.com") }
-    
-    var webView by remember { mutableStateOf<WebView?>(null) }
-    
-    // History tracking
-    var history by remember { mutableStateOf(listOf<Pair<String, String>>()) }
-    
-    // Night mode for web pages
-    var isNightMode by remember { mutableStateOf(false) }
-    
-    // Ad blocking (basic)
-    var isAdBlockEnabled by remember { mutableStateOf(true) }
-    
-    // Sync URL input when tab changes
-    LaunchedEffect(activeTabIndex) {
-        activeTab?.let {
-            urlInput = it.url
-            currentTitle = it.title
-            currentUrl = it.url
-        }
+
+var webView by remember { mutableStateOf<WebView?>(null) }
+
+// History tracking
+var history by remember { mutableStateOf(listOf<Pair<String, String>>()) }
+
+// Night mode for web pages
+var isNightMode by remember { mutableStateOf(false) }
+
+// Ad blocking (basic)
+var isAdBlockEnabled by remember { mutableStateOf(true) }
+
+// Sync URL input when tab changes
+LaunchedEffect(activeTabIndex) {
+    val tab = tabs.getOrNull(activeTabIndex)
+    if (tab != null) {
+        urlInput = tab.url
+        currentTitle = tab.title
+        currentUrl = tab.url
     }
-    
+}
     // Permission launcher for storage
     val storagePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
