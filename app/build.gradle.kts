@@ -78,7 +78,7 @@ googleServices {
 dependencies {
 
   // Biometric
-implementation("androidx.biometric:biometric:1.2.0")
+implementation("androidx.biometric:biometric:1.1.0")
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)
