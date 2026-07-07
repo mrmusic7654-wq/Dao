@@ -151,7 +151,13 @@ fun EmptyOnboardingPrompt(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.verticalScroll(rememberScrollState())
         ) {
-            RotatingYinYangSymbol(isThinking = false)
+            // 🔥 BIG ANIMATED THINKING CONSTELLATION — replaces the static logo
+            Box(
+                modifier = Modifier.size(160.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                ThinkingHexagonConstellation()
+            }
 
             Spacer(modifier = Modifier.height(6.dp))
 
