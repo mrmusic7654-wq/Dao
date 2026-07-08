@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import com.example.ui.automation.AutomationEventBus
 import com.example.ui.theme.*
 import kotlinx.coroutines.*
 import java.io.*
@@ -285,12 +286,24 @@ fun FileManagerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
         val dir = File(path)
         if (!dir.exists() || !dir.isDirectory) return
 
+        // Check readability before listing
+        if (!dir.canRead()) {
+            Toast.makeText(context, "Cannot read directory. Check permissions.", Toast.LENGTH_SHORT).show()
+            if (pane == 0) leftFiles = emptyList() else rightFiles = emptyList()
+            return
+        }
+
         val allFiles = dir.listFiles()?.map { file ->
             FileItem(
                 file = file,
                 containsImages = if (file.extension.lowercase() in listOf("zip", "rar", "7z")) FileUtils.hasImagesInZip(file) else false
             )
         } ?: emptyList()
+
+        // Show message when no files found but directory is readable
+        if (allFiles.isEmpty() && dir.canRead()) {
+            // It's truly empty, not a permission issue - silently handle
+        }
 
         val filtered = allFiles.filter { file ->
             (showHidden || !file.isHidden) && (searchQuery.isBlank() || file.name.contains(searchQuery, ignoreCase = true))
@@ -425,6 +438,15 @@ fun FileManagerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
     }
 
     LaunchedEffect(Unit) {
+        // Request MANAGE_EXTERNAL_STORAGE for Android 11+ full file access
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                val intent = Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                context.startActivity(intent)
+                Toast.makeText(context, "Please grant 'All files access' to see all files", Toast.LENGTH_LONG).show()
+            }
+        }
+        
         val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
@@ -442,6 +464,29 @@ fun FileManagerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
         }
         if (permissions.isNotEmpty()) permissionLauncher.launch(permissions.toTypedArray())
         refreshFiles(leftPath, 0); refreshFiles(rightPath, 1); loadStorageInfo()
+    }
+
+    // Listen for automation events
+    LaunchedEffect(Unit) {
+        AutomationEventBus.events.collect { event ->
+            if (event.targetScreen == "FileManager") {
+                when (event.action) {
+                    "compress" -> {
+                        val path = event.parameters["path"] ?: return@collect
+                        val outputFile = File(File(currentPath), "archive_${System.currentTimeMillis()}.zip")
+                        val success = FileUtils.createZip(File(path), outputFile)
+                        AutomationEventBus.sendResult(AutomationEventBus.AutomationResult(event.requestId, success, if (success) outputFile.absolutePath else "Failed"))
+                    }
+                    "create" -> {
+                        val name = event.parameters["name"] ?: return@collect
+                        val type = event.parameters["type"] ?: "file"
+                        val newFile = File(currentPath, name)
+                        val success = if (type == "folder") newFile.mkdirs() else newFile.createNewFile()
+                        AutomationEventBus.sendResult(AutomationEventBus.AutomationResult(event.requestId, success, if (success) newFile.absolutePath else "Failed"))
+                    }
+                }
+            }
+        }
     }
 
     // ==================== DIALOGS ====================
