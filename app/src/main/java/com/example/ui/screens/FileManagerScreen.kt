@@ -284,29 +284,37 @@ fun FileManagerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
 
     fun refreshFiles(path: String, pane: Int = activePane) {
         val dir = File(path)
-        if (!dir.exists() || !dir.isDirectory) return
-
-        // Check readability before listing
-        if (!dir.canRead()) {
-            Toast.makeText(context, "Cannot read directory. Check permissions.", Toast.LENGTH_SHORT).show()
+        if (!dir.exists()) {
             if (pane == 0) leftFiles = emptyList() else rightFiles = emptyList()
+            if (pane == 0) leftPath = path else rightPath = path
+            return
+        }
+        if (!dir.canRead()) {
+            Toast.makeText(context, "Cannot access this directory. Grant 'All Files Access' permission.", Toast.LENGTH_LONG).show()
+            if (pane == 0) leftFiles = emptyList() else rightFiles = emptyList()
+            if (pane == 0) leftPath = path else rightPath = path
             return
         }
 
-        val allFiles = dir.listFiles()?.map { file ->
+        val fileArray = dir.listFiles()
+        if (fileArray == null) {
+            if (pane == 0) leftFiles = emptyList() else rightFiles = emptyList()
+            if (pane == 0) leftPath = path else rightPath = path
+            return
+        }
+
+        val allFiles = fileArray.map { file ->
             FileItem(
                 file = file,
-                containsImages = if (file.extension.lowercase() in listOf("zip", "rar", "7z")) FileUtils.hasImagesInZip(file) else false
+                containsImages = if (file.extension.lowercase() in listOf("zip", "rar", "7z")) {
+                    try { FileUtils.hasImagesInZip(file) } catch (e: Exception) { false }
+                } else false
             )
-        } ?: emptyList()
-
-        // Show message when no files found but directory is readable
-        if (allFiles.isEmpty() && dir.canRead()) {
-            // It's truly empty, not a permission issue - silently handle
         }
 
         val filtered = allFiles.filter { file ->
-            (showHidden || !file.isHidden) && (searchQuery.isBlank() || file.name.contains(searchQuery, ignoreCase = true))
+            (showHidden || !file.isHidden) &&
+            (searchQuery.isBlank() || file.name.contains(searchQuery, ignoreCase = true))
         }
 
         val sorted = when (sortMode) {

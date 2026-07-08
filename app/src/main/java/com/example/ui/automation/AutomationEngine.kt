@@ -3,8 +3,10 @@ package com.example.ui.automation
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Base64
+import com.example.Screen
 import com.example.data.repository.UserPreferences
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -77,8 +79,75 @@ object AutomationEngine {
                     "[IMAGE:data:image/jpeg;base64,$base64]"
                 } else "Screen capture failed"
             }
-            // Add more actions as needed
+            "browser_navigate" -> {
+                val url = parameters["url"] ?: return@withContext "Missing URL"
+                withContext(Dispatchers.Main) {
+                    ScreenNavigator.navigateTo(Screen.Browser)
+                }
+                delay(1000)
+                AutomationEventBus.sendEvent(
+                    AutomationEventBus.AutomationEvent(
+                        targetScreen = "Browser",
+                        action = "load_url",
+                        parameters = mapOf("url" to url),
+                        requestId = parameters["requestId"] ?: ""
+                    )
+                )
+                "Browser opened, navigating to $url"
+            }
+            "file_compress" -> {
+                val path = parameters["path"] ?: return@withContext "Missing path"
+                withContext(Dispatchers.Main) {
+                    ScreenNavigator.navigateTo(Screen.FileManager)
+                }
+                delay(500)
+                AutomationEventBus.sendEvent(
+                    AutomationEventBus.AutomationEvent(
+                        targetScreen = "FileManager",
+                        action = "compress",
+                        parameters = mapOf("path" to path),
+                        requestId = parameters["requestId"] ?: ""
+                    )
+                )
+                "File compression started for $path"
+            }
+            "screen_navigate" -> {
+                val screenName = parameters["screen"] ?: return@withContext "Missing screen name"
+                val screen = when (screenName.lowercase()) {
+                    "browser" -> Screen.Browser
+                    "filemanager" -> Screen.FileManager
+                    "videoeditor" -> Screen.VideoEditor
+                    "codeeditor" -> Screen.CodeEditor
+                    "github" -> Screen.GitHub
+                    "telegram" -> Screen.Telegram
+                    "imageeditor" -> Screen.ImageEditor
+                    "documentscanner" -> Screen.DocumentScanner
+                    "cloudstoragehub" -> Screen.CloudStorageHub
+                    "passwordvault" -> Screen.PasswordVault
+                    "notesmanager" -> Screen.NotesManager
+                    "terminalemulator" -> Screen.TerminalEmulator
+                    "automationdashboard" -> Screen.AutomationDashboard
+                    "screenrecorder" -> Screen.ScreenRecorder
+                    "daochat" -> Screen.DaoChat
+                    else -> return@withContext "Unknown screen: $screenName"
+                }
+                withContext(Dispatchers.Main) {
+                    ScreenNavigator.navigateTo(screen)
+                }
+                "Opened screen: $screenName"
+            }
             else -> "Unknown action: $action"
+        }
+    }
+
+    /**
+     * Screen navigator object for cross-screen navigation.
+     */
+    object ScreenNavigator {
+        var onNavigate: ((Screen) -> Unit)? = null
+        
+        fun navigateTo(screen: Screen) {
+            onNavigate?.invoke(screen)
         }
     }
 
@@ -130,6 +199,9 @@ Available tools:
 - telegram_send: chat_id (number), text (string)
 - file_read: path (string)
 - screen_capture: (none) — Capture a screenshot of the current screen for analysis
+- browser_navigate: url (string) — Open browser and navigate to URL
+- file_compress: path (string) — Compress a file/folder into a zip
+- screen_navigate: screen (string) — Navigate to a specific screen (browser, filemanager, videoeditor, etc.)
 
 Do not output anything else besides the action block when performing an action. When the task is finished, respond with a summary.
         """.trimIndent()

@@ -232,7 +232,15 @@ fun BrowserScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                         val url = event.parameters["url"] ?: return@collect
                         webView?.loadUrl(url)
                         urlInput = url
+                        currentUrl = url
                         AutomationEventBus.sendResult(AutomationEventBus.AutomationResult(event.requestId, true, "Navigated to $url"))
+                    }
+                    "load_url" -> {
+                        val url = event.parameters["url"] ?: return@collect
+                        webView?.loadUrl(url)
+                        urlInput = url
+                        currentUrl = url
+                        AutomationEventBus.sendResult(AutomationEventBus.AutomationResult(event.requestId, true, "Loaded $url"))
                     }
                     "download_videos" -> {
                         // Trigger video detection download using detectedVideoUrl
