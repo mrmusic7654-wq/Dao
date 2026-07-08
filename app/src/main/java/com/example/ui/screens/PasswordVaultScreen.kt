@@ -190,7 +190,7 @@ fun PasswordVaultScreen(isDark: Boolean, onMenuClick: () -> Unit) {
     var isLocked by remember { mutableStateOf(true) }
     var masterPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var isSetup by remember { mutableStateOf(false) } // false = first time, needs to create master password
+    var isSetup by remember { mutableStateOf(false) }
     var showSetupDialog by remember { mutableStateOf(false) }
     var unlockError by remember { mutableStateOf("") }
 
@@ -220,11 +220,20 @@ fun PasswordVaultScreen(isDark: Boolean, onMenuClick: () -> Unit) {
     // Bio-metric
     var canUseBiometrics by remember { mutableStateOf(false) }
 
+    // ===== CLEAR FORM FUNCTION — DEFINED HERE, ACCESSIBLE TO ALL DIALOGS =====
+    fun clearForm() {
+        formTitle = ""
+        formUsername = ""
+        formPassword = ""
+        formUrl = ""
+        formNotes = ""
+        formCategory = VaultCategory.LOGIN
+        showPassword = false
+    }
+
     LaunchedEffect(Unit) {
         val bm = BiometricManager.from(context)
         canUseBiometrics = bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
-
-        // Check if master password file exists
         val vaultFile = File(context.filesDir, "vault_prefs.dat")
         isSetup = !vaultFile.exists()
         if (isSetup) showSetupDialog = true
@@ -273,11 +282,6 @@ fun PasswordVaultScreen(isDark: Boolean, onMenuClick: () -> Unit) {
             ) else it }.sortedBy { it.title.lowercase() }
         }
         editingEntry = null; showAddDialog = false; clearForm()
-    }
-
-    fun clearForm() {
-        formTitle = ""; formUsername = ""; formPassword = ""; formUrl = ""; formNotes = ""
-        formCategory = VaultCategory.LOGIN; showPassword = false
     }
 
     fun exportVault() {
@@ -504,7 +508,6 @@ fun PasswordVaultScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                     IconButton(onClick = { showGenerator = true }) { Icon(Icons.Default.Password, "Generate", tint = ZenGold, modifier = Modifier.size(20.dp)) }
                     IconButton(onClick = { VaultCrypto.lock(); isLocked = true }) { Icon(Icons.Default.Lock, "Lock", tint = ZenGold, modifier = Modifier.size(20.dp)) }
                 }
-                // Category chips
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterChip(selected = selectedCategory == null, onClick = { selectedCategory = null },
                         label = { Text("All", fontSize = 10.sp) },
