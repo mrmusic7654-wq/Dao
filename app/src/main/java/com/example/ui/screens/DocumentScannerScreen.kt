@@ -245,19 +245,6 @@ fun DocumentScannerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
     var isProcessing by remember { mutableStateOf(false) }
     var processingMsg by remember { mutableStateOf("") }
 
-    val cameraCapture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-        bitmap?.let { processCapturedImage(it) }
-    }
-
-    val galleryPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let {
-            try {
-                val bmp = MediaStore.Images.Media.getBitmap(context.contentResolver, it)
-                processCapturedImage(bmp)
-            } catch (e: Exception) { Toast.makeText(context, "Failed to load image", Toast.LENGTH_SHORT).show() }
-        }
-    }
-
     fun processCapturedImage(bitmap: Bitmap) {
         isProcessing = true; processingMsg = "Detecting edges..."
         CoroutineScope(Dispatchers.Default).launch {
@@ -272,6 +259,19 @@ fun DocumentScannerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                 selectedPageIndex = currentDocument.pages.size - 1
                 viewMode = ScannerView.EDITOR; isProcessing = false
             }
+        }
+    }
+
+    val cameraCapture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+        bitmap?.let { processCapturedImage(it) }
+    }
+
+    val galleryPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let {
+            try {
+                val bmp = MediaStore.Images.Media.getBitmap(context.contentResolver, it)
+                processCapturedImage(bmp)
+            } catch (e: Exception) { Toast.makeText(context, "Failed to load image", Toast.LENGTH_SHORT).show() }
         }
     }
 
@@ -487,6 +487,12 @@ fun DocumentScannerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                                 }
                             }
                         }
+                    }
+                }
+
+                ScannerView.EXPORT -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Exporting...", color = Color.Gray)
                     }
                 }
 

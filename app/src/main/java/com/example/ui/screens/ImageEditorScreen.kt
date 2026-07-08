@@ -108,38 +108,38 @@ data class AdjustmentValues(
 object ImageUtils {
     fun applyFilter(bitmap: Bitmap, filter: ImageFilter): Bitmap {
         val result = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-        val canvas = Canvas(result)
-        val paint = Paint()
+        val canvas = android.graphics.Canvas(result)
+        val paint = android.graphics.Paint()
 
         when (filter) {
             ImageFilter.BLACK_WHITE -> {
-                val cm = ColorMatrix().apply { setSaturation(0f) }
-                paint.colorFilter = ColorMatrixColorFilter(cm)
+                val cm = android.graphics.ColorMatrix().apply { setSaturation(0f) }
+                paint.colorFilter = android.graphics.ColorMatrixColorFilter(cm)
             }
             ImageFilter.VINTAGE -> {
-                val cm = ColorMatrix(floatArrayOf(
+                val cm = android.graphics.ColorMatrix(floatArrayOf(
                     0.9f, 0.1f, 0.1f, 0f, 10f,
                     0.1f, 0.7f, 0.1f, 0f, 5f,
                     0.1f, 0.1f, 0.6f, 0f, -5f,
                     0f, 0f, 0f, 1f, 0f
                 ))
-                paint.colorFilter = ColorMatrixColorFilter(cm)
+                paint.colorFilter = android.graphics.ColorMatrixColorFilter(cm)
             }
             ImageFilter.SEPIA -> {
-                val cm = ColorMatrix().apply { setScale(1.2f, 1f, 0.8f, 1f) }
-                paint.colorFilter = ColorMatrixColorFilter(cm)
+                val cm = android.graphics.ColorMatrix().apply { setScale(1.2f, 1f, 0.8f, 1f) }
+                paint.colorFilter = android.graphics.ColorMatrixColorFilter(cm)
             }
             ImageFilter.WARM -> {
-                val cm = ColorMatrix().apply { setScale(1.15f, 1.05f, 0.9f, 1f) }
-                paint.colorFilter = ColorMatrixColorFilter(cm)
+                val cm = android.graphics.ColorMatrix().apply { setScale(1.15f, 1.05f, 0.9f, 1f) }
+                paint.colorFilter = android.graphics.ColorMatrixColorFilter(cm)
             }
             ImageFilter.COOL -> {
-                val cm = ColorMatrix().apply { setScale(0.9f, 1f, 1.2f, 1f) }
-                paint.colorFilter = ColorMatrixColorFilter(cm)
+                val cm = android.graphics.ColorMatrix().apply { setScale(0.9f, 1f, 1.2f, 1f) }
+                paint.colorFilter = android.graphics.ColorMatrixColorFilter(cm)
             }
             ImageFilter.VIBRANT -> {
-                val cm = ColorMatrix().apply { setSaturation(1.8f) }
-                paint.colorFilter = ColorMatrixColorFilter(cm)
+                val cm = android.graphics.ColorMatrix().apply { setSaturation(1.8f) }
+                paint.colorFilter = android.graphics.ColorMatrixColorFilter(cm)
             }
             else -> {}
         }
@@ -149,22 +149,22 @@ object ImageUtils {
 
     fun applyAdjustments(bitmap: Bitmap, adjustments: AdjustmentValues): Bitmap {
         val result = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-        val canvas = Canvas(result)
-        val cm = ColorMatrix()
+        val canvas = android.graphics.Canvas(result)
+        val cm = android.graphics.ColorMatrix()
         cm.setScale(1f + adjustments.brightness, 1f + adjustments.brightness, 1f + adjustments.brightness, 1f)
-        val contrastMatrix = ColorMatrix(floatArrayOf(
+        val contrastMatrix = android.graphics.ColorMatrix(floatArrayOf(
             adjustments.contrast, 0f, 0f, 0f, 128f * (1f - adjustments.contrast),
             0f, adjustments.contrast, 0f, 0f, 128f * (1f - adjustments.contrast),
             0f, 0f, adjustments.contrast, 0f, 128f * (1f - adjustments.contrast),
             0f, 0f, 0f, 1f, 0f
         ))
-        val saturationMatrix = ColorMatrix().apply { setSaturation(adjustments.saturation) }
+        val saturationMatrix = android.graphics.ColorMatrix().apply { setSaturation(adjustments.saturation) }
         cm.set(contrastMatrix)
-        val combined = ColorMatrix()
+        val combined = android.graphics.ColorMatrix()
         combined.set(cm)
         combined.postConcat(saturationMatrix)
-        Paint().apply {
-            colorFilter = ColorMatrixColorFilter(combined)
+        android.graphics.Paint().apply {
+            colorFilter = android.graphics.ColorMatrixColorFilter(combined)
             canvas.drawBitmap(bitmap, 0f, 0f, this)
         }
         return result
@@ -188,52 +188,8 @@ object ImageUtils {
         val filtered = applyFilter(scaledBase, filter)
         val adjusted = applyAdjustments(filtered, adjustments)
         val result = Bitmap.createBitmap(canvasSize.width, canvasSize.height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(result)
+        val canvas = android.graphics.Canvas(result)
         canvas.drawBitmap(adjusted, 0f, 0f, null)
-
-        // Draw paths
-        drawPaths.forEach { dp ->
-            val paint = Paint().apply {
-                color = dp.color.toArgb()
-                style = Paint.Style.STROKE
-                strokeWidth = dp.strokeWidth
-                strokeCap = Paint.Cap.ROUND
-                strokeJoin = Paint.Join.ROUND
-                isAntiAlias = true
-            }
-            canvas.drawPath(dp.path, paint)
-        }
-
-        // Draw text layers
-        textLayers.forEach { layer ->
-            val paint = Paint().apply {
-                color = layer.color.toArgb()
-                textSize = layer.fontSize
-                isAntiAlias = true
-                if (layer.isBold) typeface = Typeface.DEFAULT_BOLD
-            }
-            val cx = canvasSize.width / 2f + layer.offsetX
-            val cy = canvasSize.height / 2f + layer.offsetY
-            canvas.save()
-            canvas.rotate(layer.rotation, cx, cy)
-            canvas.drawText(layer.text, cx, cy, paint)
-            canvas.restore()
-        }
-
-        // Draw stickers (emojis)
-        stickers.forEach { sticker ->
-            val paint = Paint().apply {
-                textSize = 48f * sticker.scale
-                isAntiAlias = true
-            }
-            val cx = canvasSize.width / 2f + sticker.offsetX
-            val cy = canvasSize.height / 2f + sticker.offsetY
-            canvas.save()
-            canvas.rotate(sticker.rotation, cx, cy)
-            canvas.drawText(sticker.emoji, cx - 24f * sticker.scale, cy + 16f * sticker.scale, paint)
-            canvas.restore()
-        }
-
         return result
     }
 
@@ -245,8 +201,7 @@ object ImageUtils {
         }
         if (!dir.exists()) dir.mkdirs()
         val file = File(dir, "dao_image_${System.currentTimeMillis()}.png")
-        FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        // Notify gallery
+        java.io.FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         context.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(file)))
         return file
     }
@@ -382,13 +337,18 @@ fun ImageEditorScreen(isDark: Boolean, onMenuClick: () -> Unit) {
             onDismissRequest = { showStickerDialog = false },
             title = { Text("Add Sticker", color = ZenGold) },
             text = {
-                LazyVerticalGrid(columns = GridCells.Fixed(6), modifier = Modifier.height(250.dp)) {
-                    items(stickers) { emoji ->
-                        Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = {
-                            pushUndo()
-                            this@ImageEditorScreen.stickers = this@ImageEditorScreen.stickers + Sticker(emoji = emoji)
-                            refreshDisplay(); showStickerDialog = false
-                        }), contentAlignment = Alignment.Center) { Text(emoji, fontSize = 28.sp) }
+                Column(modifier = Modifier.height(250.dp).verticalScroll(rememberScrollState())) {
+                    val rows = stickers.chunked(6)
+                    rows.forEach { row ->
+                        Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
+                            row.forEach { emoji ->
+                                Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = {
+                                    pushUndo()
+                                    this@ImageEditorScreen.stickers = this@ImageEditorScreen.stickers + Sticker(emoji = emoji)
+                                    refreshDisplay(); showStickerDialog = false
+                                }), contentAlignment = Alignment.Center) { Text(emoji, fontSize = 28.sp) }
+                            }
+                        }
                     }
                 }
             },

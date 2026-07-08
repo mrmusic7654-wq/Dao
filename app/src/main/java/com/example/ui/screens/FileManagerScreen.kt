@@ -799,7 +799,7 @@ private fun PaneColumn(
                         Spacer(Modifier.width(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(fileItem.name, color = YinText, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("${if (fileItem.isDirectory) "Folder" else FileUtils.formatSize(fileItem.size))} • ${FileUtils.formatDate(fileItem.lastModified)}", color = YinTextSecondary, fontSize = 9.sp, maxLines = 1)
+                            Text("${if (fileItem.isDirectory) "Folder" else FileUtils.formatSize(fileItem.size)} • ${FileUtils.formatDate(fileItem.lastModified)}", color = YinTextSecondary, fontSize = 9.sp, maxLines = 1)
                         }
                         if (!isSelectionMode && isActive) {
                             IconButton(onClick = { onRename(fileItem) }, modifier = Modifier.size(22.dp)) { Icon(Icons.Default.Edit, null, tint = YinTextSecondary.copy(alpha = 0.5f), modifier = Modifier.size(12.dp)) }
