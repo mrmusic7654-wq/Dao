@@ -11,6 +11,9 @@ import java.io.ByteArrayOutputStream
 
 object AutomationEngine {
 
+    // Activity reference for screen capture
+    var mainActivity: android.app.Activity? = null
+
     /**
      * Executes an action parsed from AI response.
      * Returns a result string to feed back into the conversation.
@@ -65,7 +68,7 @@ object AutomationEngine {
                 }
             }
             "screen_capture" -> {
-                val activity = context as? android.app.Activity
+                val activity = mainActivity ?: context as? android.app.Activity
                 val bitmap = captureScreen(activity)
                 if (bitmap != null) {
                     val baos = ByteArrayOutputStream()
