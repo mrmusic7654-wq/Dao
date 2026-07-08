@@ -706,7 +706,12 @@ fun SettingsDialog(
                                         color = if (isDark) YinText else Color.Black
                                     )
                                     Text(
-                                        text = if (maxTokens < 512f) "Short Chants" else if (maxTokens < 2048f) "Deep Discourses" else "Infinite Sagas",
+                                        text = when {
+                                            maxTokens < 1024f -> "Short Chants"
+                                            maxTokens < 4096f -> "Deep Discourses"
+                                            maxTokens < 16384f -> "Long Sagas"
+                                            else -> "Infinite Sagas"
+                                        },
                                         style = MaterialTheme.typography.labelSmall,
                                         color = ZenGold
                                     )
@@ -717,7 +722,7 @@ fun SettingsDialog(
                                         maxTokens = it
                                         prefs.maxTokens = it.toInt()
                                     },
-                                    valueRange = 128f..4096f,
+                                    valueRange = 128f..65536f,  // Increased to 64k
                                     colors = SliderDefaults.colors(
                                         thumbColor = ZenGold,
                                         activeTrackColor = ZenGold,
@@ -725,7 +730,7 @@ fun SettingsDialog(
                                     )
                                 )
                                 Text(
-                                    text = "Limits the maximum length of generated replies from online API models to save system resources and balance visual flows.",
+                                    text = "Limits the maximum length of generated replies. Gemini supports up to 64k tokens.",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (isDark) YinTextSecondary else YangTextSecondary,
                                     fontSize = 10.sp

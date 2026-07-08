@@ -62,6 +62,6 @@ class UserPreferences(context: Context) {
         set(value) = prefs.edit().putFloat("ai_temperature", value).apply()
 
     var maxTokens: Int
-        get() = prefs.getInt("max_tokens", 1024)
+        get() = prefs.getInt("max_tokens", 16384)
         set(value) = prefs.edit().putInt("max_tokens", value).apply()
 }

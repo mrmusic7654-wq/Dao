@@ -44,6 +44,26 @@ object GeminiService {
             return@withContext DaoEngine.generateResponse(prompt, personality, mode)
         }
 
+        var enhancedPrompt = prompt
+        
+        // Web Search Mode: Fetch real search results and prepend to prompt
+        if (mode == "Web Search") {
+            val searchQuery = prompt.split(".").firstOrNull()?.trim() ?: prompt.take(100)
+            val searchResults = try {
+                val url = java.net.URL("https://api.duckduckgo.com/?q=${java.net.URLEncoder.encode(searchQuery, "UTF-8")}&format=json&no_html=1")
+                val result = url.readText()
+                val json = JSONObject(result)
+                json.optString("Abstract", "").ifBlank {
+                    val topics = json.optJSONArray("RelatedTopics")
+                    if (topics != null && topics.length() > 0) {
+                        topics.getJSONObject(0).optString("Text", "No results")
+                    } else "No results"
+                }
+            } catch (e: Exception) { "Search unavailable" }
+
+            enhancedPrompt = "Web search results for '$searchQuery':\n$searchResults\n\nUser query: $prompt\n\nAnswer the user's question based on the search results above."
+        }
+
         val systemInstructionText = """
             You are Dao, the cosmic companion of stillness (Yin) and structure (Yang). 
             Embody the personality vibe of: $personality.
@@ -58,7 +78,7 @@ object GeminiService {
                 put(JSONObject().apply {
                     put("parts", JSONArray().apply {
                         put(JSONObject().apply {
-                            put("text", prompt)
+                            put("text", enhancedPrompt)
                         })
                     })
                 })
@@ -72,6 +92,7 @@ object GeminiService {
             })
             put("generationConfig", JSONObject().apply {
                 put("temperature", 0.7)
+                put("maxOutputTokens", prefs.maxTokens)   // <-- ADD THIS LINE
             })
         }
 

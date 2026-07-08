@@ -205,10 +205,42 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             // Trigger Dao thinking & typing
             _isDaoTyping.value = true
             
-            // Simulate natural spiritual typing delay (e.g. 1.2 seconds) to build dramatic, game-like anticipation
-            kotlinx.coroutines.delay(1200)
+            val mode = _activeInputMode.value
+            if (mode == "Automation" || mode == "Agent") {
+                // Multistep automation loop
+                var currentPrompt = content
+                var maxSteps = 10  // Safety limit
+                while (maxSteps-- > 0) {
+                    val response = repository.generateAndSaveDaoResponse(
+                        getApplication(), sessionId, currentPrompt,
+                        _activePersonality.value, mode
+                    )
+                    // Check if response contains actions
+                    val actions = com.example.ui.automation.AutomationEngine.parseActions(response.replyText)
+                    if (actions.isEmpty()) {
+                        // No actions, task complete
+                        break
+                    }
+
+                    // Execute each action and collect results
+                    val results = mutableListOf<String>()
+                    for ((action, params) in actions) {
+                        val result = com.example.ui.automation.AutomationEngine.executeAction(action, params, getApplication())
+                        results.add(result)
+                    }
+
+                    // Feed results back as the next prompt
+                    currentPrompt = results.joinToString("\n\n") + 
+                        "\n\nContinue the task or respond if done."
+                }
+            } else {
+                // Normal mode: just generate a single response
+                // Simulate natural spiritual typing delay (e.g. 1.2 seconds) to build dramatic, game-like anticipation
+                kotlinx.coroutines.delay(1200)
+                
+                repository.generateAndSaveDaoResponse(getApplication(), sessionId, content, _activePersonality.value, _activeInputMode.value)
+            }
             
-            repository.generateAndSaveDaoResponse(getApplication(), sessionId, content, _activePersonality.value, _activeInputMode.value)
             _isDaoTyping.value = false
         }
     }
