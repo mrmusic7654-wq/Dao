@@ -121,10 +121,17 @@ object VideoUtils {
         } catch (e: Exception) { 0L }
     }
 
-    fun getThumbnail(context: Context, uri: Uri, timeUs: Long = 1000000): Bitmap? {
+    fun getThumbnail(context: Context, uri: Uri, maxWidth: Int = 300, maxHeight: Int = 300): Bitmap? {
         return try {
             val r = MediaMetadataRetriever(); r.setDataSource(context, uri)
-            val b = r.getFrameAtTime(timeUs); r.release(); b
+            val b = r.getFrameAtTime(1000000) // 1 second
+            if (b != null) {
+                val width = b.width
+                val height = b.height
+                val scale = minOf(maxWidth.toFloat() / width, maxHeight.toFloat() / height, 1f)
+                val scaled = if (scale < 1f) Bitmap.createScaledBitmap(b, (width * scale).toInt(), (height * scale).toInt(), true) else b
+                r.release(); scaled
+            } else { r.release(); null }
         } catch (e: Exception) { null }
     }
 
@@ -197,12 +204,16 @@ fun VideoEditorScreen(isDark: Boolean, onMenuClick: () -> Unit) {
     // Video picker
     val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
-            val dur = VideoUtils.getDuration(context, it)
-            val name = getFileName(context, it)
-            val thumb = VideoUtils.getThumbnail(context, it)
-            clips = clips + VideoClip(uri = it, fileName = name, durationMs = dur, thumbnail = thumb, endTrimMs = dur)
-            totalDuration = clips.sumOf { c -> c.endTrimMs - c.startTrimMs }
-            selectedClipIndex = clips.size - 1
+            try {
+                val dur = VideoUtils.getDuration(context, it)
+                val name = getFileName(context, it)
+                val thumb = VideoUtils.getThumbnail(context, it)
+                clips = clips + VideoClip(uri = it, fileName = name, durationMs = dur, thumbnail = thumb, endTrimMs = dur)
+                totalDuration = clips.sumOf { c -> c.endTrimMs - c.startTrimMs }
+                selectedClipIndex = clips.size - 1
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to load video: ${e.message}", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
