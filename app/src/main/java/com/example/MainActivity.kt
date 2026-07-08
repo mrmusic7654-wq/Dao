@@ -171,6 +171,13 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
         }
     }
 
+    // Register callback for ScreenNavigator to enable cross-screen navigation from automation
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        com.example.ui.automation.AutomationEngine.ScreenNavigator.onNavigate = { screen ->
+            currentScreen = screen
+        }
+    }
+
     var newProjectName by remember { mutableStateOf("") }
     var newTaskTitle by remember { mutableStateOf("") }
 
