@@ -578,7 +578,15 @@ fun DaoChatScreen(
                         Triple("Browser", "Dao Web Browser 🌐", Icons.Default.Language),
                         Triple("FileExplorer", "Zen File Explorer 📁", Icons.Default.Folder),
                         Triple("CodeEditor", "Zen Code Editor 💻", Icons.Default.Code),
-                        Triple("VideoEditor", "Zen Video Editor 🎥", Icons.Default.Movie)
+                        Triple("VideoEditor", "Zen Video Editor 🎥", Icons.Default.Movie),
+                        Triple("GitHub", "GitHub Manager 🐙", Icons.Default.Hub),
+                        Triple("Telegram", "Telegram Hub ✈️", Icons.Default.Send),
+                        Triple("Automation", "Automation 🤖", Icons.Default.SmartToy),
+                        Triple("ImageEditor", "Image Editor 🎨", Icons.Default.Image),
+                        Triple("DocumentScanner", "Doc Scanner 📄", Icons.Default.DocumentScanner),
+                        Triple("CloudStorage", "Cloud Storage ☁️", Icons.Default.Cloud),
+                        Triple("NotesManager", "Notes Manager 📝", Icons.Default.Note),
+                        Triple("Terminal", "Terminal 💻", Icons.Default.Terminal)
                     )
                     Card(
                         modifier = Modifier
