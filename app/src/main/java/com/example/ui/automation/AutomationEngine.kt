@@ -1,10 +1,13 @@
 package com.example.ui.automation
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.util.Base64
 import com.example.data.repository.UserPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 
 object AutomationEngine {
 
@@ -61,8 +64,30 @@ object AutomationEngine {
                     "File read error: ${e.message}"
                 }
             }
+            "screen_capture" -> {
+                val activity = context as? android.app.Activity
+                val bitmap = captureScreen(activity)
+                if (bitmap != null) {
+                    val baos = ByteArrayOutputStream()
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
+                    val base64 = Base64.getEncoder().encodeToString(baos.toByteArray())
+                    "[IMAGE:data:image/jpeg;base64,$base64]"
+                } else "Screen capture failed"
+            }
             // Add more actions as needed
             else -> "Unknown action: $action"
+        }
+    }
+
+    /**
+     * Captures a screenshot of the current screen.
+     */
+    private suspend fun captureScreen(activity: android.app.Activity?): Bitmap? = withContext(Dispatchers.Main) {
+        activity?.window?.decorView?.rootView?.let { view ->
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(bitmap)
+            view.draw(canvas)
+            bitmap
         }
     }
 
@@ -101,6 +126,7 @@ Available tools:
 - github_create_repo: name (string)
 - telegram_send: chat_id (number), text (string)
 - file_read: path (string)
+- screen_capture: (none) — Capture a screenshot of the current screen for analysis
 
 Do not output anything else besides the action block when performing an action. When the task is finished, respond with a summary.
         """.trimIndent()

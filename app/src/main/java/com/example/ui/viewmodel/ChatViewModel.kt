@@ -207,9 +207,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             
             val mode = _activeInputMode.value
             if (mode == "Automation" || mode == "Agent") {
-                // Multistep automation loop
+                // Multistep automation loop with planning step
                 var currentPrompt = content
-                var maxSteps = 10  // Safety limit
+                var maxSteps = 20  // Safety limit increased for complex tasks
+                
+                // First, ask the AI to create a plan
+                val planPrompt = "You are in Automation mode. The user wants: $content. " +
+                    "First, produce a concise step-by-step plan. Then, output actions to execute each step using the [ACTION:...] format. " +
+                    "After each action, you will receive the result. Continue until all steps are complete. " +
+                    "If the task is too long, output [CONTINUE] to signal you need more steps. Begin now."
+                val planResponse = repository.generateAndSaveDaoResponse(getApplication(), sessionId, planPrompt, _activePersonality.value, mode)
+                currentPrompt = planResponse.content
+                
                 while (maxSteps-- > 0) {
                     val response = repository.generateAndSaveDaoResponse(
                         getApplication(), sessionId, currentPrompt,
@@ -217,6 +226,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     // Check if response contains actions
                     val actions = com.example.ui.automation.AutomationEngine.parseActions(response.content)
+                    
+                    // Check for [CONTINUE] tag - self-continuation
+                    if (actions.isEmpty() && response.content.contains("[CONTINUE]")) {
+                        currentPrompt = "Continue with the next step."
+                        continue
+                    }
+                    
                     if (actions.isEmpty()) {
                         // No actions, task complete
                         break

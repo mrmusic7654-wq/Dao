@@ -1,12 +1,11 @@
-```
 # Compiled and build artifacts
 *.class
 *.o
 *.obj
+*.exe
+*.dll
 *.so
 *.a
-*.dll
-*.exe
 *.out
 build/
 dist/
@@ -70,4 +69,3 @@ htmlcov/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-```

@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import com.example.ui.automation.AutomationEventBus
 import com.example.ui.theme.*
 import kotlinx.coroutines.*
 import java.io.File
@@ -218,6 +219,31 @@ fun BrowserScreen(isDark: Boolean, onMenuClick: () -> Unit) {
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                 storagePermissionLauncher.launch(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE))
+            }
+        }
+    }
+
+    // Listen for automation events
+    LaunchedEffect(Unit) {
+        AutomationEventBus.events.collect { event ->
+            if (event.targetScreen == "Browser") {
+                when (event.action) {
+                    "navigate" -> {
+                        val url = event.parameters["url"] ?: return@collect
+                        webView?.loadUrl(url)
+                        urlInput = url
+                        AutomationEventBus.sendResult(AutomationEventBus.AutomationResult(event.requestId, true, "Navigated to $url"))
+                    }
+                    "download_videos" -> {
+                        // Trigger video detection download using detectedVideoUrl
+                        detectedVideoUrl?.let { url ->
+                            startDownload(url, "video_${System.currentTimeMillis()}.mp4", isVideo = true)
+                            AutomationEventBus.sendResult(AutomationEventBus.AutomationResult(event.requestId, true, "Downloaded video"))
+                        } ?: run {
+                            AutomationEventBus.sendResult(AutomationEventBus.AutomationResult(event.requestId, false, "No video detected"))
+                        }
+                    }
+                }
             }
         }
     }
