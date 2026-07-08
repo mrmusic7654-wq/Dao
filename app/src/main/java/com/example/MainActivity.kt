@@ -81,6 +81,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Set activity reference for screen capture
+        com.example.ui.automation.AutomationEngine.mainActivity = this
         enableEdgeToEdge()
         setContent {
             val themeMode = remember { mutableStateOf("auto") }
@@ -144,6 +146,30 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
     val tasks by viewModel.allTasks.collectAsStateWithLifecycle()
     val activePersonality by viewModel.activePersonality.collectAsStateWithLifecycle()
     val activeInputMode by viewModel.activeInputMode.collectAsStateWithLifecycle()
+
+    // Listen for automation events and navigate to target screens
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        com.example.ui.automation.AutomationEventBus.events.collect { event ->
+            if (event.action == "open") {
+                when (event.targetScreen) {
+                    "Browser" -> currentScreen = Screen.Browser
+                    "FileManager" -> currentScreen = Screen.FileManager
+                    "VideoEditor" -> currentScreen = Screen.VideoEditor
+                    "CodeEditor" -> currentScreen = Screen.CodeEditor
+                    "GitHub" -> currentScreen = Screen.GitHub
+                    "Telegram" -> currentScreen = Screen.Telegram
+                    "ImageEditor" -> currentScreen = Screen.ImageEditor
+                    "DocumentScanner" -> currentScreen = Screen.DocumentScanner
+                    "CloudStorageHub" -> currentScreen = Screen.CloudStorageHub
+                    "PasswordVault" -> currentScreen = Screen.PasswordVault
+                    "NotesManager" -> currentScreen = Screen.NotesManager
+                    "TerminalEmulator" -> currentScreen = Screen.TerminalEmulator
+                    "AutomationDashboard" -> currentScreen = Screen.AutomationDashboard
+                    "ScreenRecorder" -> currentScreen = Screen.ScreenRecorder
+                }
+            }
+        }
+    }
 
     var newProjectName by remember { mutableStateOf("") }
     var newTaskTitle by remember { mutableStateOf("") }
@@ -606,7 +632,8 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                             activePersonality = activePersonality,
                             onPersonalityChange = { viewModel.updatePersonality(it) },
                             activeInputMode = activeInputMode,
-                            onInputModeChange = { viewModel.updateInputMode(it) }
+                            onInputModeChange = { viewModel.updateInputMode(it) },
+                            viewModel = viewModel
                         )
                     }
                     Screen.VideoEditor -> {

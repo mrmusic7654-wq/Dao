@@ -36,6 +36,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val _isDaoTyping = MutableStateFlow(false)
     val isDaoTyping: StateFlow<Boolean> = _isDaoTyping.asStateFlow()
 
+    // Current response job for cancellation (stop button)
+    var currentResponseJob: kotlinx.coroutines.Job? = null
+        private set
+
     // Active Personality State
     private val _activePersonality = MutableStateFlow("Zen Sage")
     val activePersonality: StateFlow<String> = _activePersonality.asStateFlow()
@@ -136,6 +140,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 _activeSessionId.value = currentSessions.first().id
             }
         }
+
+        // Listen for automation results and feed them back to chat
+        viewModelScope.launch {
+            com.example.ui.automation.AutomationEventBus.results.collect { result ->
+                val sessionId = _activeSessionId.value ?: return@collect
+                repository.insertUserMessage(sessionId, "[SYSTEM RESULT] ${result.message}")
+            }
+        }
     }
 
     fun selectSession(sessionId: Long) {
@@ -194,11 +206,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Cancel current AI response (for stop button)
+    fun cancelCurrentResponse() {
+        currentResponseJob?.cancel()
+        _isDaoTyping.value = false
+    }
+
     fun sendMessage(content: String) {
         val sessionId = _activeSessionId.value ?: return
         if (content.isBlank() || _isDaoTyping.value) return
 
-        viewModelScope.launch {
+        currentResponseJob = viewModelScope.launch {
             // Save user message
             repository.insertUserMessage(sessionId, content)
             

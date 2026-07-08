@@ -68,7 +68,8 @@ fun DaoChatScreen(
     activePersonality: String,
     onPersonalityChange: (String) -> Unit,
     activeInputMode: String,
-    onInputModeChange: (String) -> Unit
+    onInputModeChange: (String) -> Unit,
+    viewModel: com.example.ui.viewmodel.ChatViewModel? = null
 ) {
     val context = LocalContext.current
     var inputText by remember { mutableStateOf("") }
@@ -840,27 +841,42 @@ fun DaoChatScreen(
                             }
                         },
                         trailingIcon = {
-                            IconButton(onClick = {
-                                if (prefs.hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                val intent = RecognizerIntent.ACTION_RECOGNIZE_SPEECH.let { action ->
-                                    Intent(action).apply {
-                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to Dao")
+                            Row {
+                                // Stop button - only show when AI is typing
+                                if (isTyping) {
+                                    IconButton(onClick = {
+                                        viewModel.cancelCurrentResponse()
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Stop,
+                                            contentDescription = "Stop Response",
+                                            tint = ZenRed,
+                                            modifier = Modifier.size(20.dp)
+                                        )
                                     }
-                                }
-                                try {
-                                    voiceInputLauncher.launch(intent)
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Speech not available", Toast.LENGTH_SHORT).show()
-                                }
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Default.Mic,
-                                    contentDescription = "Voice Input",
-                                    tint = ZenBlue,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                                } else {
+                                    IconButton(onClick = {
+                                        if (prefs.hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        val intent = RecognizerIntent.ACTION_RECOGNIZE_SPEECH.let { action ->
+                                            Intent(action).apply {
+                                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to Dao")
+                                            }
+                                        }
+                                        try {
+                                            voiceInputLauncher.launch(intent)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Speech not available", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Mic,
+                                            contentDescription = "Voice Input",
+                                            tint = ZenBlue,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }\n                            }
                         },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = if (isDarkBackground) Color(0xFF141418) else Color(0xFFECE9E4),
