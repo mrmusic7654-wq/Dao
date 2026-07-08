@@ -1,7 +1,15 @@
 package com.example.ui.screens
 
 import android.content.*
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.Canvas as AndroidCanvas
+import android.graphics.Color as AndroidColor
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Matrix as AndroidMatrix
+import android.graphics.Paint as AndroidPaint
+import android.graphics.Path as AndroidPath
+import android.graphics.Typeface
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Build
@@ -112,10 +120,10 @@ object DocProcessor {
             // Simplified edge detection — in production use OpenCV
             val margin = 0.08f
             return QuadCorners(
-                PointF(width * margin, height * margin),
-                PointF(width * (1f - margin), height * margin),
-                PointF(width * (1f - margin), height * (1f - margin)),
-                PointF(width * margin, height * (1f - margin))
+                android.graphics.PointF(width * margin, height * margin),
+                android.graphics.PointF(width * (1f - margin), height * margin),
+                android.graphics.PointF(width * (1f - margin), height * (1f - margin)),
+                android.graphics.PointF(width * margin, height * (1f - margin))
             )
         } catch (e: Exception) { return null }
     }
@@ -123,7 +131,7 @@ object DocProcessor {
     fun applyPerspectiveCorrection(bitmap: Bitmap, corners: QuadCorners, targetW: Int = 2480, targetH: Int = 3508): Bitmap {
         val src = corners.toFloatArray()
         val dst = floatArrayOf(0f, 0f, targetW.toFloat(), 0f, targetW.toFloat(), targetH.toFloat(), 0f, targetH.toFloat())
-        val matrix = Matrix()
+        val matrix = AndroidMatrix()
         matrix.setPolyToPoly(src, 0, dst, 0, 4)
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
             .let { Bitmap.createScaledBitmap(it, targetW, targetH, true) }
@@ -131,8 +139,8 @@ object DocProcessor {
 
     fun applyFilter(bitmap: Bitmap, filter: DocFilter): Bitmap {
         val result = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-        val canvas = Canvas(result)
-        val paint = Paint()
+        val canvas = AndroidCanvas(result)
+        val paint = AndroidPaint()
 
         when (filter) {
             DocFilter.BNW -> {
@@ -143,8 +151,8 @@ object DocProcessor {
                 val pixels = IntArray(result.width * result.height)
                 result.getPixels(pixels, 0, result.width, 0, 0, result.width, result.height)
                 for (i in pixels.indices) {
-                    val gray = (Color.red(pixels[i]) + Color.green(pixels[i]) + Color.blue(pixels[i])) / 3
-                    pixels[i] = if (gray > 128) Color.WHITE else Color.BLACK
+                    val gray = (AndroidColor.red(pixels[i]) + AndroidColor.green(pixels[i]) + AndroidColor.blue(pixels[i])) / 3
+                    pixels[i] = if (gray > 128) AndroidColor.WHITE else AndroidColor.BLACK
                 }
                 result.setPixels(pixels, 0, result.width, 0, 0, result.width, result.height)
             }
@@ -182,7 +190,7 @@ object DocProcessor {
     }
 
     fun rotateBitmap(bitmap: Bitmap, degrees: Float): Bitmap {
-        val matrix = Matrix().apply { postRotate(degrees) }
+        val matrix = AndroidMatrix().apply { postRotate(degrees) }
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 
