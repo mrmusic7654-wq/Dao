@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -107,7 +108,7 @@ fun DaoChatScreen(
             val matches = result.data!!.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
             if (!matches.isNullOrEmpty()) {
                 inputText = matches[0]
-                if (prefs.hapticEnabled) haptic.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                if (prefs.hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 Toast.makeText(context, "Voice captured!", Toast.LENGTH_SHORT).show()
             }
         }
@@ -827,7 +828,7 @@ fun DaoChatScreen(
                         },
                         leadingIcon = {
                             IconButton(onClick = { 
-                                if (prefs.hapticEnabled) haptic.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                                if (prefs.hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 imagePickerLauncher.launch("image/*") 
                             }) {
                                 Icon(
@@ -840,7 +841,7 @@ fun DaoChatScreen(
                         },
                         trailingIcon = {
                             IconButton(onClick = {
-                                if (prefs.hapticEnabled) haptic.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                                if (prefs.hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 val intent = RecognizerIntent.ACTION_RECOGNIZE_SPEECH.let { action ->
                                     Intent(action).apply {
                                         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -878,7 +879,7 @@ fun DaoChatScreen(
 
                     Button(
                         onClick = {
-                            if (prefs.hapticEnabled) haptic.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                            if (prefs.hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             if (inputText.isNotBlank() && !isTyping) {
                                 val messageToSend = StringBuilder().apply {
                                     if (selectedTools.isNotEmpty()) {

@@ -619,7 +619,8 @@ fun FileManagerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                 // Header
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (currentPath != internalStorage.absolutePath) {
+                        val currentActivePath = if (activePane == 0) leftPath else rightPath
+                        if (currentActivePath != internalStorage.absolutePath) {
                             IconButton(onClick = { navigateUp() }) {
                                 Icon(Icons.Default.ArrowBack, "Back", tint = YinText)
                             }
