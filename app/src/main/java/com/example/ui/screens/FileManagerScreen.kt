@@ -315,6 +315,14 @@ fun FileManagerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
         if (parent != null && parent.canRead()) refreshFiles(parent.absolutePath, pane)
     }
 
+    fun getMimeTypeForFile(ext: String) = when (ext) {
+        "jpg", "jpeg" -> "image/jpeg"; "png" -> "image/png"; "gif" -> "image/gif"; "webp" -> "image/webp"
+        "mp4" -> "video/mp4"; "mkv" -> "video/x-matroska"; "mp3" -> "audio/mpeg"
+        "pdf" -> "application/pdf"; "apk" -> "application/vnd.android.package-archive"
+        "zip" -> "application/zip"; "txt" -> "text/plain"; "html" -> "text/html"
+        else -> "*/*"
+    }
+
     fun handleFileClick(fileItem: FileItem) {
         if (isSelectionMode) {
             val path = fileItem.file.absolutePath
@@ -354,14 +362,6 @@ fun FileManagerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                 }
             }
         }
-    }
-
-    fun getMimeTypeForFile(ext: String) = when (ext) {
-        "jpg", "jpeg" -> "image/jpeg"; "png" -> "image/png"; "gif" -> "image/gif"; "webp" -> "image/webp"
-        "mp4" -> "video/mp4"; "mkv" -> "video/x-matroska"; "mp3" -> "audio/mpeg"
-        "pdf" -> "application/pdf"; "apk" -> "application/vnd.android.package-archive"
-        "zip" -> "application/zip"; "txt" -> "text/plain"; "html" -> "text/html"
-        else -> "*/*"
     }
 
     fun deleteSelected() {

@@ -173,19 +173,20 @@ object TerminalEngine {
                 } else if (dir.isFile) {
                     TerminalLine(text = dir.name, type = LineType.OUTPUT)
                 } else {
-                    val files = dir.listFiles()?.sortedBy { !it.isDirectory } ?: emptyArray()
+                    val files = dir.listFiles()?.sortedBy { !it.isDirectory } ?: arrayOf()
                     val output = buildString {
                         if (showDetails) appendLine("total ${files.size}")
-                        files.filter { showHidden || !it.name.startsWith(".") }.forEach { file ->
+                        for (file in files) {
+                            if (!showHidden && file.name.startsWith(".")) continue
                             if (showDetails) {
                                 val perms = (if (file.isDirectory) "d" else "-") + "rwxr-xr-x"
-                                val owner = "dao"
                                 val size = formatSize(file.length())
                                 val date = SimpleDateFormat("MMM dd HH:mm", Locale.getDefault()).format(Date(file.lastModified()))
-                                val color = if (file.isDirectory) "\u001B[34m" else if (file.canExecute()) "\u001B[32m" else ""
-                                appendLine("$perms $owner $owner ${size.padStart(6)} $date ${color}${file.name}\u001B[0m")
+                                val prefix = if (file.isDirectory) "/" else if (file.canExecute()) "*" else ""
+                                appendLine("$perms dao dao ${size.padStart(6)} $date $prefix${file.name}")
                             } else {
-                                append("${file.name}  ")
+                                val prefix = if (file.isDirectory) "/" else if (file.canExecute()) "*" else ""
+                                append("$prefix${file.name}  ")
                             }
                         }
                     }
@@ -327,96 +328,102 @@ object TerminalEngine {
             when (action) {
                 "create-repo" -> {
                     val name = args.trim()
-                    if (name.isBlank()) TerminalLine(text = "Usage: github create-repo <name>", type = LineType.ERROR)
-                    else {
+                    if (name.isBlank()) {
+                        TerminalLine(text = "Usage: github create-repo <name>", type = LineType.ERROR)
+                    } else {
                         val result = GitHubApiService.createRepo(token, name, "", true)
-                        if (result.contains("\"error\""))
-                            TerminalLine(text = "❌ Failed: $result", type = LineType.ERROR)
-                        else {
-                            codespaceOwner = token.let { "user" } // Simplified
+                        if (result.contains("\"error\"")) {
+                            TerminalLine(text = "Failed: $result", type = LineType.ERROR)
+                        } else {
                             codespaceRepo = name
-                            TerminalLine(text = "✅ Repo created: $name (private). Use 'github ls' to explore.", type = LineType.SUCCESS)
+                            TerminalLine(text = "Repo created: $name (private). Use 'github ls' to explore.", type = LineType.SUCCESS)
                         }
                     }
                 }
                 "clone" -> {
-                    val target = args.ifBlank { return@try TerminalLine(text = "Usage: github clone <owner/repo>", type = LineType.ERROR) }
-                    val parts2 = target.split("/")
-                    if (parts2.size != 2) TerminalLine(text = "Usage: github clone <owner/repo>", type = LineType.ERROR)
-                    else {
-                        codespaceOwner = parts2[0]; codespaceRepo = parts2[1]
-                        currentCodespaceDirectory = "/"
-                        TerminalLine(text = "✅ Cloned $target. Use 'github ls' to explore.", type = LineType.SUCCESS)
+                    if (args.isBlank()) {
+                        TerminalLine(text = "Usage: github clone <owner/repo>", type = LineType.ERROR)
+                    } else {
+                        val repoParts = args.split("/")
+                        if (repoParts.size != 2) {
+                            TerminalLine(text = "Usage: github clone <owner/repo>", type = LineType.ERROR)
+                        } else {
+                            codespaceOwner = repoParts[0]
+                            codespaceRepo = repoParts[1]
+                            currentCodespaceDirectory = "/"
+                            TerminalLine(text = "Cloned $args. Use 'github ls' to explore.", type = LineType.SUCCESS)
+                        }
                     }
                 }
                 "ls" -> {
-                    if (codespaceOwner.isBlank() || codespaceRepo.isBlank())
-                        TerminalLine(text = "⚠️ No repo connected. Use 'github clone <owner/repo>'", type = LineType.ERROR)
-                    else {
+                    if (codespaceOwner.isBlank() || codespaceRepo.isBlank()) {
+                        TerminalLine(text = "No repo connected. Use 'github clone <owner/repo>'", type = LineType.ERROR)
+                    } else {
                         val path = args.ifBlank { currentCodespaceDirectory.removePrefix("/") }
                         val result = GitHubApiService.listDirectory(token, codespaceOwner, codespaceRepo, path)
                         if (result.contains("\"error\"")) {
-                            TerminalLine(text = "❌ Failed to list directory", type = LineType.ERROR)
+                            TerminalLine(text = "Failed to list directory", type = LineType.ERROR)
                         } else {
-                            val arr = JSONArray(result)
-                            val output = buildString {
-                                for (i in 0 until arr.length()) {
-                                    val obj = arr.getJSONObject(i)
-                                    val name = obj.getString("name")
-                                    val type = if (obj.getString("type") == "dir") "📁" else "📄"
-                                    val size = if (obj.getString("type") != "dir") formatSize(obj.optLong("size", 0)) else ""
-                                    appendLine("$type $name $size")
-                                }
+                            val arr = org.json.JSONArray(result)
+                            val output = StringBuilder()
+                            for (i in 0 until arr.length()) {
+                                val obj = arr.getJSONObject(i)
+                                val name = obj.getString("name")
+                                val type = if (obj.getString("type") == "dir") "/" else ""
+                                val size = if (obj.getString("type") != "dir") formatSize(obj.optLong("size", 0)) else ""
+                                output.appendLine("$type$name $size")
                             }
-                            TerminalLine(text = output.ifBlank { "(empty directory)" }, type = LineType.OUTPUT)
+                            TerminalLine(text = output.toString().ifBlank { "(empty)" }, type = LineType.OUTPUT)
                         }
                     }
                 }
                 "cat" -> {
-                    if (codespaceOwner.isBlank()) TerminalLine(text = "⚠️ No repo connected.", type = LineType.ERROR)
-                    else {
+                    if (codespaceOwner.isBlank()) {
+                        TerminalLine(text = "No repo connected.", type = LineType.ERROR)
+                    } else if (args.isBlank()) {
+                        TerminalLine(text = "Usage: github cat <file>", type = LineType.ERROR)
+                    } else {
                         val result = GitHubApiService.getFileContent(token, codespaceOwner, codespaceRepo, args)
                         if (result.contains("\"error\"")) {
-                            TerminalLine(text = "❌ File not found: $args", type = LineType.ERROR)
+                            TerminalLine(text = "File not found: $args", type = LineType.ERROR)
                         } else {
-                            val json = JSONObject(result)
+                            val json = org.json.JSONObject(result)
                             val content = String(Base64.getDecoder().decode(json.getString("content").replace("\n", "")))
                             TerminalLine(text = content.take(5000), type = LineType.OUTPUT)
                         }
                     }
                 }
                 "rm" -> {
-                    if (codespaceOwner.isBlank()) TerminalLine(text = "⚠️ No repo connected.", type = LineType.ERROR)
-                    else {
+                    if (codespaceOwner.isBlank()) {
+                        TerminalLine(text = "No repo connected.", type = LineType.ERROR)
+                    } else if (args.isBlank()) {
+                        TerminalLine(text = "Usage: github rm <file>", type = LineType.ERROR)
+                    } else {
                         val sha = GitHubApiService.getFileSha(token, codespaceOwner, codespaceRepo, args)
-                        if (sha == null) TerminalLine(text = "❌ File not found: $args", type = LineType.ERROR)
-                        else {
+                        if (sha == null) {
+                            TerminalLine(text = "File not found: $args", type = LineType.ERROR)
+                        } else {
                             GitHubApiService.deleteFile(token, codespaceOwner, codespaceRepo, args, "Deleted $args", sha)
-                            TerminalLine(text = "✅ Deleted: $args", type = LineType.SUCCESS)
+                            TerminalLine(text = "Deleted: $args", type = LineType.SUCCESS)
                         }
                     }
                 }
                 "help" -> TerminalLine(
                     text = """
-╔══════════════════════════════════════╗
-║     GITHUB CODESPACE COMMANDS       ║
-╠══════════════════════════════════════╣
-║ github create-repo <name>  New repo ║
-║ github clone <owner/repo>  Connect  ║
-║ github ls [path]           List     ║
-║ github cat <file>          Read     ║
-║ github rm <file>           Delete   ║
-║ github help                Help     ║
-║                                      ║
-║ File editing:                        ║
-║ nano <file>                Edit      ║
-╚══════════════════════════════════════╝
+GitHub Codespace Commands:
+  github create-repo <name>     Create new private repo
+  github clone <owner/repo>     Connect to a repo
+  github ls [path]              List files in directory
+  github cat <file>             View file contents
+  github rm <file>              Delete a file
+  github help                   Show this help
+  nano <file>                   Edit/create a file
                     """.trimIndent(), type = LineType.OUTPUT
                 )
                 else -> TerminalLine(text = "Unknown github command. Try 'github help'", type = LineType.ERROR)
             }
         } catch (e: Exception) {
-            TerminalLine(text = "❌ Error: ${e.message}", type = LineType.ERROR)
+            TerminalLine(text = "Error: ${e.message}", type = LineType.ERROR)
         }
     }
 
