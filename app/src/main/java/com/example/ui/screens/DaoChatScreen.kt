@@ -1,6 +1,19 @@
 package com.example.ui.screens
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import android.speech.RecognizerIntent
+import android.util.Base64
+import android.view.HapticFeedbackConstants
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -23,17 +36,21 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.data.model.ChatMessage
 import com.example.data.model.UserProfile
+import com.example.data.repository.UserPreferences
 import com.example.ui.components.*
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,6 +73,45 @@ fun DaoChatScreen(
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
+    val prefs = remember { UserPreferences(context) }
+
+    // Image Picker Launcher for Multimodal Input
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            try {
+                val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val source = ImageDecoder.createSource(context.contentResolver, it)
+                    ImageDecoder.decodeBitmap(source)
+                } else {
+                    MediaStore.Images.Media.getBitmap(context.contentResolver, it)
+                }
+                val baos = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 80, baos)
+                val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+                inputText = "[IMAGE:data:image/jpeg;base64,$base64] $inputText"
+                Toast.makeText(context, "Image attached", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to load image", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // Voice Input Launcher for Real Speech Recognition
+    val voiceInputLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK && result.data != null) {
+            val matches = result.data!!.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            if (!matches.isNullOrEmpty()) {
+                inputText = matches[0]
+                if (prefs.hapticEnabled) haptic.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                Toast.makeText(context, "Voice captured!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     // Model Selection State
     var activeModel by remember { mutableStateOf("gemini-2.5-flash") }
@@ -770,20 +826,36 @@ fun DaoChatScreen(
                             )
                         },
                         leadingIcon = {
-                            IconButton(onClick = { showAttachmentDialog = true }) {
+                            IconButton(onClick = { 
+                                if (prefs.hapticEnabled) haptic.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                                imagePickerLauncher.launch("image/*") 
+                            }) {
                                 Icon(
                                     imageVector = Icons.Default.AttachFile,
-                                    contentDescription = "Attach File",
+                                    contentDescription = "Attach Image",
                                     tint = ZenGold,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
                         },
                         trailingIcon = {
-                            IconButton(onClick = { isRecordingVoice = true }) {
+                            IconButton(onClick = {
+                                if (prefs.hapticEnabled) haptic.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                                val intent = RecognizerIntent.ACTION_RECOGNIZE_SPEECH.let { action ->
+                                    Intent(action).apply {
+                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to Dao")
+                                    }
+                                }
+                                try {
+                                    voiceInputLauncher.launch(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Speech not available", Toast.LENGTH_SHORT).show()
+                                }
+                            }) {
                                 Icon(
                                     imageVector = Icons.Default.Mic,
-                                    contentDescription = "Speak to Dao",
+                                    contentDescription = "Voice Input",
                                     tint = ZenBlue,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -806,6 +878,7 @@ fun DaoChatScreen(
 
                     Button(
                         onClick = {
+                            if (prefs.hapticEnabled) haptic.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
                             if (inputText.isNotBlank() && !isTyping) {
                                 val messageToSend = StringBuilder().apply {
                                     if (selectedTools.isNotEmpty()) {

@@ -64,4 +64,16 @@ class UserPreferences(context: Context) {
     var maxTokens: Int
         get() = prefs.getInt("max_tokens", 16384)
         set(value) = prefs.edit().putInt("max_tokens", value).apply()
+
+    var aiProvider: String
+        get() = prefs.getString("ai_provider", "gemini") ?: "gemini"
+        set(value) = prefs.edit().putString("ai_provider", value).apply()
+
+    var appLockEnabled: Boolean
+        get() = prefs.getBoolean("app_lock_enabled", false)
+        set(value) = prefs.edit().putBoolean("app_lock_enabled", value).apply()
+
+    var masterPassword: String
+        get() = prefs.getString("master_password", "") ?: ""
+        set(value) = prefs.edit().putString("master_password", value).apply()
 }

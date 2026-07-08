@@ -429,6 +429,30 @@ fun SettingsDialog(
                                 color = if (isDark) YinTextSecondary else YangTextSecondary,
                                 fontSize = 11.sp
                             )
+                            
+                            // AI Provider Selection
+                            Spacer(Modifier.height(12.dp))
+                            Text("AI Provider", style = MaterialTheme.typography.labelSmall, color = ZenGold, fontWeight = FontWeight.Bold)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+                                listOf("gemini" to "Gemini", "openai" to "OpenAI", "huggingface" to "HuggingFace").forEach { (key, label) ->
+                                    FilterChip(
+                                        selected = prefs.aiProvider == key,
+                                        onClick = { prefs.aiProvider = key },
+                                        label = { Text(label, fontSize = 11.sp) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = ZenGold.copy(alpha = 0.2f),
+                                            selectedLabelColor = ZenGold
+                                        )
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "Selected: ${prefs.aiProvider.replaceFirstChar { it.uppercase() }}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isDark) YinTextSecondary else YangTextSecondary,
+                                fontSize = 10.sp
+                            )
+                            Spacer(Modifier.height(8.dp))
 
                             // 1. Gemini API Key
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

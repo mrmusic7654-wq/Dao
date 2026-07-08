@@ -98,6 +98,15 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        val prefs = UserPreferences(this)
+        if (prefs.appLockEnabled && prefs.masterPassword.isNotEmpty()) {
+            // App lock is enabled - in a full implementation, show biometric or PIN dialog here
+            // For now, we just check the preference exists
+        }
+    }
 }
 
 enum class Screen {
