@@ -392,7 +392,7 @@ fun NotesManagerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                         IconButton(onClick = {
                             engine.togglePin(note.id)
                             Toast.makeText(context, if (note.isPinned) "Unpinned" else "Pinned!", Toast.LENGTH_SHORT).show()
-                        }) { Icon(if (note.isPinned) Icons.Default.PushPin else Icons.Default.PushPinOutlined, null, tint = if (note.isPinned) ZenGold else YinTextSecondary) }
+                        }) { Icon(if (note.isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin, null, tint = if (note.isPinned) ZenGold else YinTextSecondary) }
                         IconButton(onClick = { engine.shareNote(context, note) }) { Icon(Icons.Default.Share, null, tint = YinTextSecondary) }
                     }
                 }

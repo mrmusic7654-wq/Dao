@@ -1,10 +1,13 @@
-```
+```kotlin
 # Compiled and build artifacts
 *.class
-*.o
-*.obj
+*.jar
+*.war
+*.aar
+*.apk
+*.dex
 *.so
-*.a
+*.dylib
 *.dll
 *.exe
 *.out
@@ -18,33 +21,68 @@ __pycache__/
 .pytest_cache/
 target/
 .gradle/
+.buildpath
+.project
+
+# Android specific
+*.apk
+*.ap_
+*.aab
+*.aar
+*.dex
+*.so
+.libs/
+.externalNativeBuild/
+local.properties
+captures/
+.gradle/
+.idea/
+*.iml
+*.iws
+*.hprof
+.DS_Store
+Thumbs.db
 
 # Build outputs
 build/
 dist/
 out/
+bin/
+gen/
 
-# IDE files
-.vscode/
-.idea/
+# Logs and temp files
+*.log
+*.tmp
 *.swp
 *.swo
-*.tmp
-
-# Logs
-*.log
-
-# System files
-.DS_Store
-Thumbs.db
-
-# Coverage
-coverage/
-htmlcov/
-.coverage
+*.bak
+*.~
+*~
 
 # Environment
 .env
 .env.local
-*.env.*
+.env.*
+!.env.example
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*:*
 ```
