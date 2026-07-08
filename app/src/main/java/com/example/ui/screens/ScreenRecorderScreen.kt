@@ -290,7 +290,9 @@ fun ScreenRecorderScreen(isDark: Boolean, onMenuClick: () -> Unit) {
             CoroutineScope(Dispatchers.Main).launch {
                 for (i in countdownValue downTo 1) { countdownValue = i; delay(1000) }
                 showCountdown = false
-                engine.startRecording(context, config, projection)
+                if (projection != null) {
+                    engine.startRecording(context, config, projection)
+                }
             }
         }
     }

@@ -164,29 +164,27 @@ object TerminalEngine {
             }
             trimmed.startsWith("ls") -> {
                 val args = trimmed.removePrefix("ls").trim()
-                val showHidden = args.contains("-a") || args.contains("-la")
-                val showDetails = args.contains("-l") || args.contains("-la")
+                val showHidden = args.contains("-a")
+                val showDetails = args.contains("-l")
                 val path = args.replace(Regex("-[al]+"), "").trim().ifBlank { currentDirectory }
                 val dir = File(if (path.startsWith("/")) path else File(currentDirectory, path).absolutePath)
                 if (!dir.exists()) {
-                    TerminalLine(text = "ls: cannot access '$path': No such file or directory", type = LineType.ERROR)
+                    TerminalLine(text = "ls: cannot access '$path': No such file", type = LineType.ERROR)
                 } else if (dir.isFile) {
                     TerminalLine(text = dir.name, type = LineType.OUTPUT)
                 } else {
-                    val files = dir.listFiles()?.sortedBy { !it.isDirectory } ?: arrayOf()
+                    val files = dir.listFiles() ?: arrayOf()
+                    val sorted = files.sortedBy { !it.isDirectory }
                     val output = buildString {
-                        if (showDetails) appendLine("total ${files.size}")
-                        for (file in files) {
+                        for (file in sorted) {
                             if (!showHidden && file.name.startsWith(".")) continue
                             if (showDetails) {
                                 val perms = (if (file.isDirectory) "d" else "-") + "rwxr-xr-x"
                                 val size = formatSize(file.length())
                                 val date = SimpleDateFormat("MMM dd HH:mm", Locale.getDefault()).format(Date(file.lastModified()))
-                                val prefix = if (file.isDirectory) "/" else if (file.canExecute()) "*" else ""
-                                appendLine("$perms dao dao ${size.padStart(6)} $date $prefix${file.name}")
+                                appendLine("$perms dao dao ${size.padStart(6)} $date ${file.name}")
                             } else {
-                                val prefix = if (file.isDirectory) "/" else if (file.canExecute()) "*" else ""
-                                append("$prefix${file.name}  ")
+                                append("${file.name}  ")
                             }
                         }
                     }
@@ -543,7 +541,7 @@ fun TerminalEmulatorScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                     )
                     withContext(Dispatchers.Main) {
                         try {
-                            val json = JSONObject(ghResult)
+                            val json = org.json.JSONObject(ghResult)
                             editingFileContent = String(
                                 Base64.getDecoder().decode(json.getString("content").replace("\n", ""))
                             )

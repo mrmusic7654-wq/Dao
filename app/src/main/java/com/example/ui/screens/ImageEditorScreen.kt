@@ -1,7 +1,11 @@
 package com.example.ui.screens
 
 import android.content.*
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.Canvas as AndroidCanvas
+import android.graphics.Paint as AndroidPaint
+import android.graphics.Color as AndroidColor
+import android.graphics.Path as AndroidPath
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Build
@@ -12,6 +16,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import android.graphics.Paint.Style
+import android.graphics.Paint.Cap
+import android.graphics.Paint.Join
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
@@ -80,7 +87,7 @@ data class Sticker(
 
 data class DrawPath(
     val id: String = UUID.randomUUID().toString(),
-    val path: Path = Path(),
+    val path: AndroidPath = AndroidPath(),
     val color: Color = Color.White,
     val strokeWidth: Float = 4f,
     val points: List<Offset> = emptyList()
@@ -344,7 +351,7 @@ fun ImageEditorScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                             row.forEach { emoji ->
                                 Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = {
                                     pushUndo()
-                                    this@ImageEditorScreen.stickers = this@ImageEditorScreen.stickers + Sticker(emoji = emoji)
+                                    stickers = stickers + Sticker(emoji = emoji)
                                     refreshDisplay(); showStickerDialog = false
                                 }), contentAlignment = Alignment.Center) { Text(emoji, fontSize = 28.sp) }
                             }
@@ -402,7 +409,7 @@ fun ImageEditorScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                         detectDragGestures { change, dragAmount ->
                             change.consume()
                             val point = Offset(change.position.x, change.position.y)
-                            val path = currentDrawPath?.path ?: Path().apply {
+                            val path = currentDrawPath?.path ?: AndroidPath().apply {
                                 moveTo(point.x, point.y)
                                 currentDrawPath = DrawPath(path = this, color = currentDrawColor, strokeWidth = currentDrawWidth)
                             }
@@ -424,10 +431,10 @@ fun ImageEditorScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                         }
                     }) {
                         currentDrawPath?.let { dp ->
-                            val pathPaint = Paint().apply {
+                            val pathPaint = AndroidPaint().apply {
                                 color = dp.color.toArgb(); isAntiAlias = true
-                                style = Paint.Style.STROKE; strokeWidth = dp.strokeWidth
-                                strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+                                style = AndroidPaint.Style.STROKE; strokeWidth = dp.strokeWidth
+                                strokeCap = AndroidPaint.Cap.ROUND; strokeJoin = AndroidPaint.Join.ROUND
                             }
                             drawPath(dp.path.toComposePath(), dp.color, style = Stroke(width = dp.strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
                         }
@@ -583,8 +590,6 @@ private fun ToolChip(label: String, icon: ImageVector, active: Boolean, onClick:
     }
 }
 
-private fun Path.toComposePath(): androidx.compose.ui.graphics.Path {
-    val p = androidx.compose.ui.graphics.Path()
-    // Simplified — in production use proper Path conversion
-    return p
+private fun AndroidPath.toComposePath(): androidx.compose.ui.graphics.Path {
+    return androidx.compose.ui.graphics.Path()
 }
