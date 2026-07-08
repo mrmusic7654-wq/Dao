@@ -63,24 +63,64 @@ object GeminiService {
 
             enhancedPrompt = "Web search results for '$searchQuery':\n$searchResults\n\nUser query: $prompt\n\nAnswer the user's question based on the search results above."
         }
-
-        val systemInstructionText = """
+        
+        // Deep Think Mode: Add chain-of-thought instruction
+        val systemInstructionText = if (mode == "Deep Think") {
+            """
+            You are Dao, the cosmic companion of stillness (Yin) and structure (Yang). 
+            Embody the personality vibe of: $personality.
+            Adhere to the operation mode: $mode.
+            Think step by step. Break down the problem, explain your reasoning, and then give the final answer.
+            Keep your wisdom aligned, clear, and mystical yet helpful. Respond directly to the user.
+        """.trimIndent()
+        } else {
+            """
             You are Dao, the cosmic companion of stillness (Yin) and structure (Yang). 
             Embody the personality vibe of: $personality.
             Adhere to the operation mode: $mode.
             Keep your wisdom aligned, clear, and mystical yet helpful. Respond directly to the user.
         """.trimIndent()
+        }
+
+        // Detect inline image in prompt [IMAGE:data:image/jpeg;base64,...]
+        val contentParts = JSONArray()
+        val imageData: String?
+        val textPart: String
+        
+        if (prompt.startsWith("[IMAGE:")) {
+            val endIdx = prompt.indexOf("]")
+            imageData = prompt.substring(7, endIdx) // base64 data without prefix
+            textPart = prompt.substring(endIdx + 2).trim()
+            
+            // Extract mime type from the data URL
+            val mimeType = if (imageData.startsWith("data:image/")) {
+                val mimeEnd = imageData.indexOf(";base64")
+                imageData.substring(5, mimeEnd)
+            } else "image/jpeg"
+            
+            val base64Data = if (imageData.contains(";base64,")) {
+                imageData.substringAfter(";base64,")
+            } else imageData
+            
+            contentParts.put(JSONObject().apply {
+                put("inline_data", JSONObject().apply {
+                    put("mime_type", mimeType)
+                    put("data", base64Data)
+                })
+            })
+            if (textPart.isNotEmpty()) {
+                contentParts.put(JSONObject().apply { put("text", textPart) })
+            }
+        } else {
+            contentParts.put(JSONObject().apply { put("text", enhancedPrompt) })
+        }
 
         val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
 
         val requestJson = JSONObject().apply {
             put("contents", JSONArray().apply {
                 put(JSONObject().apply {
-                    put("parts", JSONArray().apply {
-                        put(JSONObject().apply {
-                            put("text", enhancedPrompt)
-                        })
-                    })
+                    put("parts", contentParts)
                 })
             })
             put("systemInstruction", JSONObject().apply {
@@ -92,7 +132,7 @@ object GeminiService {
             })
             put("generationConfig", JSONObject().apply {
                 put("temperature", 0.7)
-                put("maxOutputTokens", prefs.maxTokens)   // <-- ADD THIS LINE
+                put("maxOutputTokens", prefs.maxTokens)
             })
         }
 
