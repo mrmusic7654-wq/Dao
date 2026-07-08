@@ -3,6 +3,8 @@ package com.example.ui.automation
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 /**
  * Event bus for automation commands between AI and screens.
@@ -28,11 +30,15 @@ object AutomationEventBus {
     private val _results = MutableSharedFlow<AutomationResult>()
     val results: SharedFlow<AutomationResult> = _results.asSharedFlow()
     
-    suspend fun send(event: AutomationEvent) {
-        _events.emit(event)
+    fun sendEvent(event: AutomationEvent) {
+        GlobalScope.launch {
+            _events.emit(event)
+        }
     }
     
-    suspend fun sendResult(result: AutomationResult) {
-        _results.emit(result)
+    fun sendResult(result: AutomationResult) {
+        GlobalScope.launch {
+            _results.emit(result)
+        }
     }
 }
