@@ -68,6 +68,7 @@ import com.example.ui.components.MessageBubble
 import com.example.ui.components.ThinkingIndicatorBubble
 import com.example.ui.components.HexagonYinYangBackground
 import com.example.ui.components.RotatingYinYangSymbol
+import com.example.ui.screens.TerminalEmulatorScreen
 import com.example.ui.screens.*
 import com.example.ui.settings.SettingsDialog
 import com.example.ui.theme.*
