@@ -34,6 +34,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Base64
 
 // ==================== DATA MODELS ====================
 
@@ -171,6 +172,48 @@ object GitHubApiService {
 
     fun deleteRepo(token: String, owner: String, repo: String): String {
         return executeRequest(token, "/repos/$owner/$repo", "DELETE")
+    }
+
+    fun getFileContent(token: String, owner: String, repo: String, path: String): String {
+        return executeRequest(token, "/repos/$owner/$repo/contents/$path")
+    }
+
+    fun createOrUpdateFile(
+        token: String, owner: String, repo: String, path: String,
+        content: String, message: String, branch: String = "main", sha: String? = null
+    ): String {
+        val json = JSONObject().apply {
+            put("message", message)
+            put("content", Base64.getEncoder().encodeToString(content.toByteArray()))
+            put("branch", branch)
+            sha?.let { put("sha", it) }
+        }
+        return executeRequest(token, "/repos/$owner/$repo/contents/$path", "PUT", json.toString())
+    }
+
+    fun deleteFile(
+        token: String, owner: String, repo: String, path: String,
+        message: String, sha: String, branch: String = "main"
+    ): String {
+        val json = JSONObject().apply {
+            put("message", message)
+            put("sha", sha)
+            put("branch", branch)
+        }
+        return executeRequest(token, "/repos/$owner/$repo/contents/$path", "DELETE", json.toString())
+    }
+
+    fun listDirectory(token: String, owner: String, repo: String, path: String = ""): String {
+        val endpoint = if (path.isBlank()) "/repos/$owner/$repo/contents"
+        else "/repos/$owner/$repo/contents/$path"
+        return executeRequest(token, endpoint)
+    }
+
+    fun getFileSha(token: String, owner: String, repo: String, path: String): String? {
+        return try {
+            val json = JSONObject(getFileContent(token, owner, repo, path))
+            json.optString("sha", null)
+        } catch (e: Exception) { null }
     }
 }
 

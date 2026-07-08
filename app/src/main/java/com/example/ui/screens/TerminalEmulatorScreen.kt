@@ -34,10 +34,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
+import com.example.ui.screens.GitHubApiService
 import kotlinx.coroutines.*
 import java.io.*
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.Base64
 
 // ==================== DATA MODELS ====================
 
@@ -69,6 +71,9 @@ object TerminalEngine {
     var currentDirectory = "/sdcard"
     var isRootMode = false
     var isAiAssistEnabled = true
+    var codespaceOwner = ""
+    var codespaceRepo = ""
+    var currentCodespaceDirectory = "/"
     val aliases = mutableMapOf<String, String>(
         "ll" to "ls -la",
         "la" to "ls -a",
@@ -225,6 +230,23 @@ object TerminalEngine {
                 isRootMode = !isRootMode
                 TerminalLine(text = "Root mode ${if (isRootMode) "activated ⚡" else "deactivated"}", type = if (isRootMode) LineType.WARNING else LineType.SYSTEM)
             }
+            trimmed.startsWith("github ") -> {
+                val githubCmd = trimmed.removePrefix("github ").trim()
+                val token = context.getSharedPreferences("dao_settings", Context.MODE_PRIVATE)
+                    .getString("github_api_key", "") ?: ""
+                if (token.isBlank()) {
+                    TerminalLine(
+                        text = "⚠️ GitHub token not set. Add it in Settings > API Integrations.",
+                        type = LineType.ERROR
+                    )
+                } else {
+                    handleGithubCommand(githubCmd, token, context)
+                }
+            }
+            trimmed.startsWith("nano ") -> {
+                val filePath = trimmed.removePrefix("nano ").trim()
+                TerminalLine(text = "EDITOR_OPEN:$filePath", type = LineType.SYSTEM)
+            }
             trimmed == "suggest" || trimmed == "ai suggest" -> {
                 val suggestions = commandSuggestions.shuffled().take(5)
                 val output = buildString {
@@ -296,6 +318,108 @@ object TerminalEngine {
         }
     }
 
+    private fun handleGithubCommand(cmd: String, token: String, context: Context): TerminalLine {
+        val parts = cmd.split(" ", limit = 2)
+        val action = parts[0]
+        val args = if (parts.size > 1) parts[1] else ""
+
+        return try {
+            when (action) {
+                "create-repo" -> {
+                    val name = args.trim()
+                    if (name.isBlank()) TerminalLine(text = "Usage: github create-repo <name>", type = LineType.ERROR)
+                    else {
+                        val result = GitHubApiService.createRepo(token, name, "", true)
+                        if (result.contains("\"error\""))
+                            TerminalLine(text = "❌ Failed: $result", type = LineType.ERROR)
+                        else {
+                            codespaceOwner = token.let { "user" } // Simplified
+                            codespaceRepo = name
+                            TerminalLine(text = "✅ Repo created: $name (private). Use 'github ls' to explore.", type = LineType.SUCCESS)
+                        }
+                    }
+                }
+                "clone" -> {
+                    val target = args.ifBlank { return@try TerminalLine(text = "Usage: github clone <owner/repo>", type = LineType.ERROR) }
+                    val parts2 = target.split("/")
+                    if (parts2.size != 2) TerminalLine(text = "Usage: github clone <owner/repo>", type = LineType.ERROR)
+                    else {
+                        codespaceOwner = parts2[0]; codespaceRepo = parts2[1]
+                        currentCodespaceDirectory = "/"
+                        TerminalLine(text = "✅ Cloned $target. Use 'github ls' to explore.", type = LineType.SUCCESS)
+                    }
+                }
+                "ls" -> {
+                    if (codespaceOwner.isBlank() || codespaceRepo.isBlank())
+                        TerminalLine(text = "⚠️ No repo connected. Use 'github clone <owner/repo>'", type = LineType.ERROR)
+                    else {
+                        val path = args.ifBlank { currentCodespaceDirectory.removePrefix("/") }
+                        val result = GitHubApiService.listDirectory(token, codespaceOwner, codespaceRepo, path)
+                        if (result.contains("\"error\"")) {
+                            TerminalLine(text = "❌ Failed to list directory", type = LineType.ERROR)
+                        } else {
+                            val arr = JSONArray(result)
+                            val output = buildString {
+                                for (i in 0 until arr.length()) {
+                                    val obj = arr.getJSONObject(i)
+                                    val name = obj.getString("name")
+                                    val type = if (obj.getString("type") == "dir") "📁" else "📄"
+                                    val size = if (obj.getString("type") != "dir") formatSize(obj.optLong("size", 0)) else ""
+                                    appendLine("$type $name $size")
+                                }
+                            }
+                            TerminalLine(text = output.ifBlank { "(empty directory)" }, type = LineType.OUTPUT)
+                        }
+                    }
+                }
+                "cat" -> {
+                    if (codespaceOwner.isBlank()) TerminalLine(text = "⚠️ No repo connected.", type = LineType.ERROR)
+                    else {
+                        val result = GitHubApiService.getFileContent(token, codespaceOwner, codespaceRepo, args)
+                        if (result.contains("\"error\"")) {
+                            TerminalLine(text = "❌ File not found: $args", type = LineType.ERROR)
+                        } else {
+                            val json = JSONObject(result)
+                            val content = String(Base64.getDecoder().decode(json.getString("content").replace("\n", "")))
+                            TerminalLine(text = content.take(5000), type = LineType.OUTPUT)
+                        }
+                    }
+                }
+                "rm" -> {
+                    if (codespaceOwner.isBlank()) TerminalLine(text = "⚠️ No repo connected.", type = LineType.ERROR)
+                    else {
+                        val sha = GitHubApiService.getFileSha(token, codespaceOwner, codespaceRepo, args)
+                        if (sha == null) TerminalLine(text = "❌ File not found: $args", type = LineType.ERROR)
+                        else {
+                            GitHubApiService.deleteFile(token, codespaceOwner, codespaceRepo, args, "Deleted $args", sha)
+                            TerminalLine(text = "✅ Deleted: $args", type = LineType.SUCCESS)
+                        }
+                    }
+                }
+                "help" -> TerminalLine(
+                    text = """
+╔══════════════════════════════════════╗
+║     GITHUB CODESPACE COMMANDS       ║
+╠══════════════════════════════════════╣
+║ github create-repo <name>  New repo ║
+║ github clone <owner/repo>  Connect  ║
+║ github ls [path]           List     ║
+║ github cat <file>          Read     ║
+║ github rm <file>           Delete   ║
+║ github help                Help     ║
+║                                      ║
+║ File editing:                        ║
+║ nano <file>                Edit      ║
+╚══════════════════════════════════════╝
+                    """.trimIndent(), type = LineType.OUTPUT
+                )
+                else -> TerminalLine(text = "Unknown github command. Try 'github help'", type = LineType.ERROR)
+            }
+        } catch (e: Exception) {
+            TerminalLine(text = "❌ Error: ${e.message}", type = LineType.ERROR)
+        }
+    }
+
     private fun formatSize(bytes: Long): String = when {
         bytes < 1024 -> "$bytes"
         bytes < 1024 * 1024 -> "${"%.1f".format(bytes / 1024.0)}K"
@@ -319,6 +443,10 @@ fun TerminalEmulatorScreen(isDark: Boolean, onMenuClick: () -> Unit) {
     var newAliasName by remember { mutableStateOf("") }
     var newAliasCommand by remember { mutableStateOf("") }
     var showHelpPanel by remember { mutableStateOf(false) }
+    var showFileEditor by remember { mutableStateOf(false) }
+    var editingFilePath by remember { mutableStateOf("") }
+    var editingFileContent by remember { mutableStateOf("") }
+    var editingFileSha by remember { mutableStateOf<String?>(null) }
 
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -395,6 +523,40 @@ fun TerminalEmulatorScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                 text = "💡 Tip: Try 'suggest' for related commands",
                 type = LineType.AI_SUGGESTION
             )
+        }
+
+        if (result.text.startsWith("EDITOR_OPEN:")) {
+            editingFilePath = result.text.removePrefix("EDITOR_OPEN:")
+            val token = context.getSharedPreferences("dao_settings", Context.MODE_PRIVATE)
+                .getString("github_api_key", "") ?: ""
+            if (token.isNotBlank() && engine.codespaceOwner.isNotBlank()) {
+                scope.launch(Dispatchers.IO) {
+                    val ghResult = GitHubApiService.getFileContent(
+                        token, engine.codespaceOwner, engine.codespaceRepo, editingFilePath
+                    )
+                    withContext(Dispatchers.Main) {
+                        try {
+                            val json = JSONObject(ghResult)
+                            editingFileContent = String(
+                                Base64.getDecoder().decode(json.getString("content").replace("\n", ""))
+                            )
+                            editingFileSha = json.optString("sha")
+                        } catch (e: Exception) {
+                            editingFileContent = ""
+                            editingFileSha = null
+                        }
+                        showFileEditor = true
+                    }
+                }
+            } else {
+                editingFileContent = ""
+                editingFileSha = null
+                showFileEditor = true
+                terminalLines = terminalLines + TerminalLine(
+                    text = "⚠️ Connect a GitHub repo first: github clone <owner/repo>",
+                    type = LineType.WARNING
+                )
+            }
         }
 
         currentInput = ""
@@ -600,6 +762,71 @@ fun TerminalEmulatorScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                 }
             }
         }
+    }
+
+    // ==================== FILE EDITOR DIALOG ====================
+    if (showFileEditor) {
+        AlertDialog(
+            onDismissRequest = { showFileEditor = false },
+            title = {
+                Text("📝 Editing: $editingFilePath",
+                    color = Color(0xFF00FF00), fontFamily = FontFamily.Monospace, fontSize = 14.sp)
+            },
+            text = {
+                OutlinedTextField(
+                    value = editingFileContent,
+                    onValueChange = { editingFileContent = it },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 350.dp),
+                    textStyle = TextStyle(
+                        color = Color(0xFFCCCCCC), fontSize = 12.sp, fontFamily = FontFamily.Monospace
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF00FF00),
+                        unfocusedBorderColor = Color(0xFF333340),
+                        cursorColor = Color(0xFF00FF00)
+                    )
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val token = context.getSharedPreferences("dao_settings", Context.MODE_PRIVATE)
+                            .getString("github_api_key", "") ?: ""
+                        if (token.isNotBlank() && engine.codespaceOwner.isNotBlank()) {
+                            scope.launch(Dispatchers.IO) {
+                                GitHubApiService.createOrUpdateFile(
+                                    token, engine.codespaceOwner, engine.codespaceRepo,
+                                    editingFilePath, editingFileContent,
+                                    "Updated $editingFilePath from Dao Terminal",
+                                    "main", editingFileSha
+                                )
+                                withContext(Dispatchers.Main) {
+                                    terminalLines = terminalLines + TerminalLine(
+                                        text = "✅ Saved & committed: $editingFilePath",
+                                        type = LineType.SUCCESS
+                                    )
+                                }
+                            }
+                        } else {
+                            terminalLines = terminalLines + TerminalLine(
+                                text = "⚠️ Cannot save: No GitHub repo connected",
+                                type = LineType.ERROR
+                            )
+                        }
+                        showFileEditor = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FF00))
+                ) {
+                    Text("Save & Commit", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFileEditor = false }) {
+                    Text("Cancel", color = Color(0xFF00FF00))
+                }
+            },
+            containerColor = Color(0xFF0F0F12)
+        )
     }
 }
 
