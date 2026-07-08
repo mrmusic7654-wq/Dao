@@ -245,7 +245,7 @@ fun ImageEditorScreen(isDark: Boolean, onMenuClick: () -> Unit) {
 
     // Crop state
     var isCropping by remember { mutableStateOf(false) }
-    var cropRect by remember { mutableStateOf(RectF()) }
+    var cropRect by remember { mutableStateOf(android.graphics.RectF()) }
 
     // Image picker
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -339,13 +339,13 @@ fun ImageEditorScreen(isDark: Boolean, onMenuClick: () -> Unit) {
     }
 
     if (showStickerDialog) {
-        val stickers = listOf("⭐", "❤️", "🔥", "💎", "🌟", "✨", "🎯", "💡", "🌈", "🦋", "🌸", "💀", "👑", "🎨", "📸", "🎬")
+        val stickerEmojis = listOf("⭐", "❤️", "🔥", "💎", "🌟", "✨", "🎯", "💡", "🌈", "🦋", "🌸", "💀", "👑", "🎨", "📸", "🎬")
         AlertDialog(
             onDismissRequest = { showStickerDialog = false },
             title = { Text("Add Sticker", color = ZenGold) },
             text = {
                 Column(modifier = Modifier.height(250.dp).verticalScroll(rememberScrollState())) {
-                    val rows = stickers.chunked(6)
+                    val rows = stickerEmojis.chunked(6)
                     rows.forEach { row ->
                         Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
                             row.forEach { emoji ->
@@ -496,12 +496,14 @@ fun ImageEditorScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                                     "Warmth" to adjustments.warmth to (-1f..1f),
                                     "Sharpness" to adjustments.sharpness to (0f..1f),
                                     "Vignette" to adjustments.vignette to (0f..1f)
-                                ).forEach { (label, range) ->
+                                ).forEach { (label, valueRange) ->
+                                    val (labelName, currentValue) = label
+                                    val range = valueRange
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(label.first, color = YinTextSecondary, fontSize = 11.sp, modifier = Modifier.width(70.dp))
-                                        Slider(value = label.second, onValueChange = { v ->
+                                        Text(labelName, color = YinTextSecondary, fontSize = 11.sp, modifier = Modifier.width(70.dp))
+                                        Slider(value = currentValue, onValueChange = { v ->
                                             pushUndo()
-                                            adjustments = when (label.first) {
+                                            adjustments = when (labelName) {
                                                 "Brightness" -> adjustments.copy(brightness = v)
                                                 "Contrast" -> adjustments.copy(contrast = v)
                                                 "Saturation" -> adjustments.copy(saturation = v)
@@ -510,8 +512,8 @@ fun ImageEditorScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                                                 "Vignette" -> adjustments.copy(vignette = v)
                                                 else -> adjustments
                                             }
-                                        }, valueRange = range.second, modifier = Modifier.weight(1f), colors = SliderDefaults.colors(thumbColor = ZenGold, activeTrackColor = ZenGold, inactiveTrackColor = Color(0xFF333340)))
-                                        Text("${"%.1f".format(label.second)}", color = ZenGold, fontSize = 10.sp, modifier = Modifier.width(35.dp))
+                                        }, valueRange = range, modifier = Modifier.weight(1f), colors = SliderDefaults.colors(thumbColor = ZenGold, activeTrackColor = ZenGold, inactiveTrackColor = Color(0xFF333340)))
+                                        Text("${"%.1f".format(currentValue)}", color = ZenGold, fontSize = 10.sp, modifier = Modifier.width(35.dp))
                                     }
                                 }
                             }
