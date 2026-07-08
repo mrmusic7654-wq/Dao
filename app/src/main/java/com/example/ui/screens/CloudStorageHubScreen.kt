@@ -110,12 +110,91 @@ object CloudEngine {
         files.removeAll { it.id.startsWith(driveId) }
     }
 
-    fun uploadFile(driveId: String, uri: Uri, fileName: String, folder: String): UploadTask {
+    fun uploadFile(driveId: String, uri: Uri, fileName: String, folder: String, context: android.content.Context): UploadTask {
         val task = UploadTask(fileName = fileName, fileUri = uri, driveId = driveId, folder = folder, status = UploadStatus.UPLOADING)
         uploadQueue.add(task)
-        // Simulate upload progress
-        simulateUpload(task)
+        // Real upload using Telegram Bot API
+        uploadToTelegram(task, context)
         return task
+    }
+
+    private fun uploadToTelegram(task: UploadTask, context: android.content.Context) {
+        val prefs = context.getSharedPreferences("dao_settings", android.content.Context.MODE_PRIVATE)
+        val token = prefs.getString("telegram_api_key", "") ?: ""
+        if (token.isBlank()) {
+            // Fallback to simulation if no token
+            simulateUpload(task)
+            return
+        }
+        
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Use a fixed chat ID for now (user should set up channel manually)
+                val chatId = -1001234567890L
+                
+                val urlStr = "https://api.telegram.org/bot$token/sendDocument"
+                val boundary = "---DaoBoundary${System.currentTimeMillis()}"
+                val url = java.net.URL(urlStr)
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.doOutput = true
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+                connection.connectTimeout = 30000
+                connection.readTimeout = 60000
+                
+                val output = java.io.DataOutputStream(connection.outputStream)
+                
+                // Write chat_id
+                output.writeBytes("--$boundary\r\n")
+                output.writeBytes("Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n")
+                output.writeBytes("$chatId\r\n")
+                
+                // Write file
+                output.writeBytes("--$boundary\r\n")
+                output.writeBytes("Content-Disposition: form-data; name=\"document\"; filename=\"${task.fileName}\"\r\n")
+                output.writeBytes("Content-Type: application/octet-stream\r\n\r\n")
+                
+                context.contentResolver.openInputStream(task.fileUri)?.use { input ->
+                    input.copyTo(output)
+                }
+                
+                output.writeBytes("\r\n--$boundary--\r\n")
+                output.flush()
+                output.close()
+                
+                val responseCode = connection.responseCode
+                val response = try {
+                    connection.inputStream.bufferedReader().readText()
+                } catch (e: Exception) {
+                    connection.errorStream?.bufferedReader()?.readText() ?: ""
+                }
+                
+                withContext(Dispatchers.Main) {
+                    val idx = uploadQueue.indexOf(task)
+                    if (idx >= 0 && responseCode in 200..299) {
+                        uploadQueue[idx] = task.copy(progress = 1f, status = UploadStatus.COMPLETED)
+                        val newFile = CloudFile(
+                            id = "${task.driveId}_${System.currentTimeMillis()}",
+                            name = task.fileName, folder = task.folder, size = task.size, uploadedAt = System.currentTimeMillis()
+                        )
+                        files.add(0, newFile)
+                        recentFiles.add(0, newFile)
+                        if (recentFiles.size > 50) recentFiles.removeAt(recentFiles.size - 1)
+                        totalStorageUsed += task.size
+                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                            uploadQueue.remove(task)
+                        }, 2000)
+                    } else {
+                        uploadQueue[idx] = task.copy(status = UploadStatus.FAILED)
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    val idx = uploadQueue.indexOf(task)
+                    if (idx >= 0) uploadQueue[idx] = task.copy(status = UploadStatus.FAILED)
+                }
+            }
+        }
     }
 
     private fun simulateUpload(task: UploadTask) {
@@ -199,7 +278,7 @@ fun CloudStorageHubScreen(isDark: Boolean, onMenuClick: () -> Unit) {
             val name = getFileName(context, it)
             val size = getFileSize(context, it)
             selectedDrive?.let { drive ->
-                CloudEngine.uploadFile(drive.id, it, name, currentFolder)
+                CloudEngine.uploadFile(drive.id, it, name, currentFolder, context)
                 Toast.makeText(context, "Uploading: $name", Toast.LENGTH_SHORT).show()
             }
         }

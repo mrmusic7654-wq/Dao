@@ -484,6 +484,9 @@ fun DocumentScannerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                                     ToolChip("Delete", Icons.Default.Delete, ZenRed) { deletePage() }
                                     ToolChip("Add Page", Icons.Default.Add, ZenGold) { viewMode = ScannerView.CAMERA }
                                     ToolChip("Export", Icons.Default.Save, Color(0xFF4CAF50)) { showExportDialog = true }
+                                    ToolChip("OCR", Icons.Default.TextSnippet, Color(0xFF4CAF50)) { 
+                                        Toast.makeText(context, "OCR feature coming soon!", Toast.LENGTH_SHORT).show() 
+                                    }
                                 }
                             }
                         }
