@@ -216,7 +216,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         _activePersonality.value, mode
                     )
                     // Check if response contains actions
-                    val actions = com.example.ui.automation.AutomationEngine.parseActions(response.replyText)
+                    val actions = com.example.ui.automation.AutomationEngine.parseActions(response.content)
                     if (actions.isEmpty()) {
                         // No actions, task complete
                         break
