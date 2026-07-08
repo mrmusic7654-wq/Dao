@@ -73,7 +73,7 @@ object AutomationEngine {
                 if (bitmap != null) {
                     val baos = ByteArrayOutputStream()
                     bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
-                    val base64 = Base64.getEncoder().encodeToString(baos.toByteArray())
+                    val base64 = java.util.Base64.getEncoder().encodeToString(baos.toByteArray())
                     "[IMAGE:data:image/jpeg;base64,$base64]"
                 } else "Screen capture failed"
             }

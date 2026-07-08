@@ -845,7 +845,7 @@ fun DaoChatScreen(
                                 // Stop button - only show when AI is typing
                                 if (isTyping) {
                                     IconButton(onClick = {
-                                        viewModel.cancelCurrentResponse()
+                                        viewModel?.cancelCurrentResponse()
                                     }) {
                                         Icon(
                                             imageVector = Icons.Default.Stop,
@@ -876,7 +876,8 @@ fun DaoChatScreen(
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
-                                }\n                            }
+                                }
+                            }
                         },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = if (isDarkBackground) Color(0xFF141418) else Color(0xFFECE9E4),

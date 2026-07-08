@@ -466,21 +466,21 @@ fun FileManagerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
         refreshFiles(leftPath, 0); refreshFiles(rightPath, 1); loadStorageInfo()
     }
 
-    // Listen for automation events
+    // Listen for automation events - use getCurrentPath() instead of currentPath
     LaunchedEffect(Unit) {
         AutomationEventBus.events.collect { event ->
             if (event.targetScreen == "FileManager") {
                 when (event.action) {
                     "compress" -> {
                         val path = event.parameters["path"] ?: return@collect
-                        val outputFile = File(File(currentPath), "archive_${System.currentTimeMillis()}.zip")
+                        val outputFile = File(File(getCurrentPath()), "archive_${System.currentTimeMillis()}.zip")
                         val success = FileUtils.createZip(File(path), outputFile)
                         AutomationEventBus.sendResult(AutomationEventBus.AutomationResult(event.requestId, success, if (success) outputFile.absolutePath else "Failed"))
                     }
                     "create" -> {
                         val name = event.parameters["name"] ?: return@collect
                         val type = event.parameters["type"] ?: "file"
-                        val newFile = File(currentPath, name)
+                        val newFile = File(getCurrentPath(), name)
                         val success = if (type == "folder") newFile.mkdirs() else newFile.createNewFile()
                         AutomationEventBus.sendResult(AutomationEventBus.AutomationResult(event.requestId, success, if (success) newFile.absolutePath else "Failed"))
                     }
