@@ -197,6 +197,50 @@ object ImageUtils {
         val result = Bitmap.createBitmap(canvasSize.width, canvasSize.height, Bitmap.Config.ARGB_8888)
         val canvas = android.graphics.Canvas(result)
         canvas.drawBitmap(adjusted, 0f, 0f, null)
+        
+        // Draw paths
+        for (dp in drawPaths) {
+            val paint = android.graphics.Paint().apply {
+                color = dp.color.toArgb()
+                style = android.graphics.Paint.Style.STROKE
+                strokeWidth = dp.strokeWidth
+                strokeCap = android.graphics.Paint.Cap.ROUND
+                strokeJoin = android.graphics.Paint.Join.ROUND
+                isAntiAlias = true
+            }
+            canvas.drawPath(dp.path, paint)
+        }
+        
+        // Draw text layers
+        for (layer in textLayers) {
+            val paint = android.graphics.Paint().apply {
+                color = layer.color.toArgb()
+                textSize = layer.fontSize
+                isAntiAlias = true
+                if (layer.isBold) typeface = android.graphics.Typeface.DEFAULT_BOLD
+            }
+            val cx = canvasSize.width / 2f + layer.offsetX
+            val cy = canvasSize.height / 2f + layer.offsetY
+            canvas.save()
+            canvas.rotate(layer.rotation, cx, cy)
+            canvas.drawText(layer.text, cx, cy, paint)
+            canvas.restore()
+        }
+        
+        // Draw stickers (emojis)
+        for (sticker in stickers) {
+            val paint = android.graphics.Paint().apply {
+                textSize = 48f * sticker.scale
+                isAntiAlias = true
+            }
+            val cx = canvasSize.width / 2f + sticker.offsetX
+            val cy = canvasSize.height / 2f + sticker.offsetY
+            canvas.save()
+            canvas.rotate(sticker.rotation, cx, cy)
+            canvas.drawText(sticker.emoji, cx - 24f * sticker.scale, cy + 16f * sticker.scale, paint)
+            canvas.restore()
+        }
+        
         return result
     }
 

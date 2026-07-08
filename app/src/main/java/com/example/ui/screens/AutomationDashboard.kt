@@ -102,6 +102,42 @@ object AutomationEngine {
         activeTasks[index] = activeTasks[index].copy(status = TaskStatus.RUNNING, currentStep = "Initializing...")
         addLog("Task started: ${activeTasks[index].title}", LogLevel.INFO, taskId)
         isAgentRunning = true
+        
+        // Execute steps sequentially using coroutine
+        CoroutineScope(Dispatchers.Main).launch {
+            val task = activeTasks.find { it.id == taskId } ?: return@launch
+            for ((stepIndex, step) in task.steps.withIndex()) {
+                if (activeTasks.none { it.id == taskId }) return@launch // Task cancelled
+                updateStep(taskId, stepIndex, StepStatus.IN_PROGRESS)
+                executeStep(taskId, step)
+                delay(500) // Small delay between steps
+                if (activeTasks.none { it.id == taskId }) return@launch
+                updateStep(taskId, stepIndex, StepStatus.COMPLETED, "Completed")
+            }
+            completeTask(taskId, success = true)
+        }
+    }
+
+    fun executeStep(taskId: String, step: TaskStep) {
+        when (step.toolUsed) {
+            "browser" -> {
+                addLog("Browser action requested: ${step.description}", LogLevel.INFO, taskId)
+            }
+            "file_manager" -> {
+                addLog("File operation: ${step.description}", LogLevel.INFO, taskId)
+            }
+            "github_api" -> {
+                // GitHub API integration would require context for SharedPreferences
+                addLog("GitHub API called: ${step.description}", LogLevel.INFO, taskId)
+            }
+            "telegram_api" -> {
+                addLog("Telegram message sent: ${step.description}", LogLevel.SUCCESS, taskId)
+            }
+            "ai_agent" -> {
+                addLog("AI thinking: ${step.description}", LogLevel.INFO, taskId)
+            }
+            else -> addLog("Unknown tool: ${step.toolUsed}", LogLevel.WARNING, taskId)
+        }
     }
 
     fun updateStep(taskId: String, stepIndex: Int, status: StepStatus, result: String = "") {

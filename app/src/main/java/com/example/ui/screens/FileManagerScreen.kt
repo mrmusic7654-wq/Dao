@@ -13,6 +13,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -29,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -800,7 +802,18 @@ private fun PaneColumn(
         if (files.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Empty", color = Color.Gray, fontSize = 12.sp) }
         } else {
-            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectHorizontalDragGestures { _, dragAmount ->
+                            if (dragAmount > 100) {
+                                onNavigateUp()
+                            }
+                        }
+                    },
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+            ) {
                 // Shortcuts at root
                 if (path == internalStorage.absolutePath && isActive) {
                     item { MiniShortcut(Icons.Default.Image, "Images", Color(0xFF4FC3F7)) { File(internalStorage, "DCIM").let { if (it.exists()) onRefresh() } } }
