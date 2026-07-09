@@ -8,6 +8,7 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.provider.Settings
 import android.speech.RecognizerIntent
 import android.util.Base64
 import android.view.HapticFeedbackConstants

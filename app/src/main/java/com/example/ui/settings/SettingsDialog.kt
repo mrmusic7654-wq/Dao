@@ -1,5 +1,7 @@
 package com.example.ui.settings
 
+import android.content.Intent
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -956,6 +958,39 @@ fun SettingsDialog(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Wipe Discourse History", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                             }
+
+                            HorizontalDivider(color = if (isDark) Color(0xFF22222A) else Color(0xFFE2DDD3))
+
+                            // Accessibility Service Status
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("UI Automation Service", color = if (isDark) YinText else Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text("Allows Dao to tap, scroll, and type on screen", color = if (isDark) YinTextSecondary else YangTextSecondary, fontSize = 10.sp)
+                                }
+                                val isAccessibilityEnabled = isAccessibilityServiceEnabled(context)
+                                Surface(
+                                    color = if (isAccessibilityEnabled) Color(0xFF4CAF50).copy(alpha = 0.2f) else Color(0xFFF44336).copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        if (isAccessibilityEnabled) "Enabled ✓" else "Disabled ✗",
+                                        color = if (isAccessibilityEnabled) Color(0xFF4CAF50) else Color(0xFFF44336),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                                if (!isAccessibilityEnabled) {
+                                    Spacer(Modifier.width(4.dp))
+                                    TextButton(onClick = {
+                                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                                    }) { Text("Enable", color = ZenGold, fontSize = 11.sp) }
+                                }
+                            }
                         }
 
                         "Celestial" -> {
@@ -1048,4 +1083,13 @@ fun SettingsDialog(
             }
         }
     )
+}
+
+private fun isAccessibilityServiceEnabled(context: android.content.Context): Boolean {
+    val serviceName = "${context.packageName}/.ui.automation.DaoAccessibilityService"
+    val enabledServices = Settings.Secure.getString(
+        context.contentResolver,
+        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+    ) ?: return false
+    return enabledServices.contains(serviceName)
 }
