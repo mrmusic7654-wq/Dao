@@ -40,6 +40,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     var currentResponseJob: kotlinx.coroutines.Job? = null
         private set
 
+    // Automation state controls for floating overlay buttons
+    var automationPaused = false
+    var automationCancelled = false
+
     // Active Personality State
     private val _activePersonality = MutableStateFlow("Zen Sage")
     val activePersonality: StateFlow<String> = _activePersonality.asStateFlow()
