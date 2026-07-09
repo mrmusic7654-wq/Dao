@@ -487,6 +487,19 @@ fun DocumentScannerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                                     ToolChip("OCR", Icons.Default.TextSnippet, Color(0xFF4CAF50)) { 
                                         Toast.makeText(context, "OCR feature coming soon!", Toast.LENGTH_SHORT).show() 
                                     }
+                                    // Fix 15: Document Q&A with RAG - Ask Dao about this document
+                                    if (currentDocument.pages.isNotEmpty()) {
+                                        ToolChip("Ask Dao", Icons.Default.QuestionAnswer, StatusInfo) {
+                                            // Build text from all pages (in a real app, use OCR results)
+                                            val docText = "Document: ${currentDocument.name}\nPages: ${currentDocument.pages.size}"
+                                            val intent = android.content.Intent(context, MainActivity::class.java).apply {
+                                                putExtra("auto_prompt", "Answer questions about this document:\n\n$docText")
+                                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                                            }
+                                            context.startActivity(intent)
+                                            Toast.makeText(context, "Opening Dao Chat with document context...", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                 }
                             }
                         }

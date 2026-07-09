@@ -156,6 +156,63 @@ object AutomationEngine {
                 delay(ms)
                 "Waited for ${ms}ms"
             }
+            "web_scrape" -> {
+                val url = parameters["url"] ?: return@withContext "Missing URL"
+                try {
+                    val doc = org.jsoup.Jsoup.connect(url)
+                        .userAgent("Mozilla/5.0 (Android 14; Mobile)")
+                        .timeout(15000)
+                        .get()
+                    val text = doc.body().text().take(5000)
+                    "Scraped content from $url:\n$text"
+                } catch (e: Exception) {
+                    "Scrape failed: ${e.message}"
+                }
+            }
+            "volume_set" -> {
+                val level = (parameters["level"]?.toIntOrNull() ?: 50).coerceIn(0, 100)
+                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+                val max = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+                audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, (max * level / 100), 0)
+                "Volume set to $level%"
+            }
+            "brightness_set" -> {
+                val level = (parameters["level"]?.toIntOrNull() ?: 50).coerceIn(0, 255)
+                if (android.provider.Settings.System.canWrite(context)) {
+                    android.provider.Settings.System.putInt(context.contentResolver, android.provider.Settings.System.SCREEN_BRIGHTNESS, level)
+                    "Brightness set to $level"
+                } else {
+                    "Cannot write system settings. Grant permission."
+                }
+            }
+            "wifi_toggle" -> {
+                val wifiManager = context.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+                val enabled = !wifiManager.isWifiEnabled
+                wifiManager.isWifiEnabled = enabled
+                "WiFi ${if (enabled) "enabled" else "disabled"}"
+            }
+            "bluetooth_toggle" -> {
+                val btAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+                val enabled = btAdapter?.let { !it.isEnabled } ?: false
+                if (enabled) btAdapter?.enable() else btAdapter?.disable()
+                "Bluetooth ${if (enabled) "enabled" else "disabled"}"
+            }
+            "sms_send" -> {
+                val number = parameters["number"] ?: return@withContext "Missing number"
+                val text = parameters["text"] ?: return@withContext "Missing text"
+                val smsManager = android.telephony.SmsManager.getDefault()
+                smsManager.sendTextMessage(number, null, text, null, null)
+                "SMS sent to $number"
+            }
+            "call_dial" -> {
+                val number = parameters["number"] ?: return@withContext "Missing number"
+                val intent = android.content.Intent(android.content.Intent.ACTION_DIAL).apply { 
+                    data = android.net.Uri.parse("tel:$number") 
+                }
+                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                "Dialing $number"
+            }
             else -> "Unknown action: $action"
         }
     }
@@ -228,6 +285,13 @@ Available tools:
 - ui_back: (none) — Press the back button
 - ui_read_screen: (none) — Read all text visible on screen (use this to verify UI state before tapping)
 - wait: ms (number) — Wait for specified milliseconds before next action (use to let UI settle)
+- web_scrape: url (string) — Scrape content from a webpage using Jsoup
+- volume_set: level (number 0-100) — Set media volume level
+- brightness_set: level (number 0-255) — Set screen brightness (requires WRITE_SETTINGS permission)
+- wifi_toggle: (none) — Toggle WiFi on/off
+- bluetooth_toggle: (none) — Toggle Bluetooth on/off
+- sms_send: number (string), text (string) — Send SMS message
+- call_dial: number (string) — Open dialer with number
 
 TIP: Before tapping an element, use ui_read_screen to verify it exists. Use wait after navigation to let screens load.
 
