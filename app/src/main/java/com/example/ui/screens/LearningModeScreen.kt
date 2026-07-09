@@ -3,6 +3,7 @@ package com.example.ui.screens
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -34,11 +35,11 @@ data class Flashcard(
 object SpacedRepetitionEngine {
     fun calculateNextReview(card: Flashcard, quality: Int): Flashcard {
         // SM-2 algorithm
-        val newEase = (card.ease + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))).coerceAtLeast(1.3f)
+        val newEase = (card.ease + (0.1f - (5 - quality) * (0.08f + (5 - quality) * 0.02f))).coerceAtLeast(1.3f)
         val newInterval = when {
             card.repetitions == 0 -> 1
             card.repetitions == 1 -> 6
-            else -> (card.interval * newEase).toInt()
+            else -> (card.interval.toFloat() * newEase).toInt()
         }
         val nextReview = System.currentTimeMillis() + (newInterval * 24 * 60 * 60 * 1000L)
         return card.copy(

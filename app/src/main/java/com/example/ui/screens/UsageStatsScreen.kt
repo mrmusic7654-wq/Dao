@@ -90,7 +90,7 @@ fun UsageStatsScreen(isDark: Boolean, onMenuClick: () -> Unit) {
             }
 
             // App list
-            LazyColumn(padding = PaddingValues(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(appList) { app ->
                     val percentage = if (totalScreenTime > 0) (app.timeUsedMs.toFloat() / totalScreenTime * 100) else 0f
                     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A24))) {

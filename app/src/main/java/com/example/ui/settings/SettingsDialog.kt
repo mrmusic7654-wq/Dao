@@ -719,33 +719,11 @@ fun SettingsDialog(
 
                             HorizontalDivider(color = if (isDark) Color(0xFF22222A) else Color(0xFFE2DDD3))
 
-                            // Offline AI Model Download (Enhancement 9)
-                            var isDownloading by remember { mutableStateOf(false) }
-                            var downloadProgress by remember { mutableFloatStateOf(0f) }
-                            val localEngine = remember { com.example.data.dao_engine.LocalInferenceEngine(context) }
-
+                            // Offline AI Model - Coming Soon
                             Card(modifier = Modifier.fillMaxWidth()) {
                                 Column(modifier = Modifier.padding(12.dp)) {
-                                    Text("Offline AI Model", color = ZenGold, fontWeight = FontWeight.Bold)
-                                    Text("Download Gemma 2B for offline use (~1.5 GB)", color = YinTextSecondary, fontSize = 11.sp)
-
-                                    if (isDownloading) {
-                                        androidx.compose.material3.LinearProgressIndicator(
-                                            progress = { downloadProgress },
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                        Text("${(downloadProgress * 100).toInt()}%", color = ZenGold, fontSize = 12.sp)
-                                    } else {
-                                        Button(onClick = {
-                                            isDownloading = true
-                                            localEngine.downloadModel { progress ->
-                                                downloadProgress = progress
-                                                if (progress >= 1f || progress < 0f) isDownloading = false
-                                            }
-                                        }) {
-                                            Text(if (localEngine.isAvailable()) "Model Ready ✓" else "Download Offline Model")
-                                        }
-                                    }
+                                    Text("Offline AI", color = ZenGold, fontWeight = FontWeight.Bold)
+                                    Text("On-device models coming soon. Currently using cloud AI.", color = YinTextSecondary, fontSize = 11.sp)
                                 }
                             }
 
