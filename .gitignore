@@ -1,25 +1,18 @@
+```
 # Compiled and build artifacts
 *.class
 *.o
 *.obj
 *.out
 build/
+target/
 
 # Dependencies
-.libs/
-.libs-rpath/
-julia-*/
-zig*/
-
-# Logs and temp files
-*.log
-*.tmp
-*.swp
-
-# Environment
-.env
-.env.local
-*.env.*
+.gradle/
+node_modules/
+venv/
+.venv/
+__pycache__/
 
 # Editors
 .vscode/
@@ -27,17 +20,21 @@ zig*/
 *.swp
 *.swo
 
-# Coverage
+# Logs and temp files
+*.log
+*.tmp
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Coverage reports
 coverage/
 htmlcov/
 .coverage
 
-# Gradle
-.gradle/
-build/
-
-# MyPy
-.mypy_cache/
-
-# Pytest
-.pytest_cache/
+# OS generated files
+.DS_Store
+Thumbs.db
+```

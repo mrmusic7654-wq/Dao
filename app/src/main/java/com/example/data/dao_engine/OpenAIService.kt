@@ -26,19 +26,20 @@ object OpenAIService {
         context: Context,
         prompt: String,
         personality: String,
-        mode: String
+        mode: String,
+        systemInstructionOverride: String? = null
     ): DaoResponse = withContext(Dispatchers.IO) {
         val prefs = UserPreferences(context)
         val apiKey = prefs.openAiApiKey
         
         if (apiKey.isBlank()) {
-            return@withContext GeminiService.generateResponse(context, prompt, personality, mode)
+            return@withContext GeminiService.generateResponse(context, prompt, personality, mode, systemInstructionOverride)
         }
 
         var enhancedPrompt = prompt
         
         // Deep Think Mode: Add chain-of-thought instruction
-        val systemContent = if (mode == "Deep Think") {
+        val systemContent = systemInstructionOverride ?: if (mode == "Deep Think") {
             "You are Dao, a wise assistant. Personality: $personality. Mode: $mode. Think step by step. Break down the problem, explain your reasoning, and then give the final answer."
         } else {
             "You are Dao, a wise assistant. Personality: $personality. Mode: $mode."

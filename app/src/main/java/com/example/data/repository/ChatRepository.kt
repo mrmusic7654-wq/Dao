@@ -52,12 +52,12 @@ class ChatRepository(private val chatDao: ChatDao) {
         return userMsg
     }
 
-    suspend fun generateAndSaveDaoResponse(context: android.content.Context, sessionId: Long, userMessageContent: String, personality: String = "Zen Sage", mode: String = "Direct"): ChatMessage {
+    suspend fun generateAndSaveDaoResponse(context: android.content.Context, sessionId: Long, userMessageContent: String, personality: String = "Zen Sage", mode: String = "Direct", systemInstructionOverride: String? = null): ChatMessage {
         val prefs = UserPreferences(context)
         val response = when (prefs.aiProvider) {
-            "openai" -> com.example.data.dao_engine.OpenAIService.generateResponse(context, userMessageContent, personality, mode)
-            "huggingface" -> com.example.data.dao_engine.HuggingFaceService.generateResponse(context, userMessageContent, personality, mode)
-            else -> com.example.data.dao_engine.GeminiService.generateResponse(context, userMessageContent, personality, mode)
+            "openai" -> com.example.data.dao_engine.OpenAIService.generateResponse(context, userMessageContent, personality, mode, systemInstructionOverride)
+            "huggingface" -> com.example.data.dao_engine.HuggingFaceService.generateResponse(context, userMessageContent, personality, mode, systemInstructionOverride)
+            else -> com.example.data.dao_engine.GeminiService.generateResponse(context, userMessageContent, personality, mode, systemInstructionOverride)
         }
         
         val daoMsg = ChatMessage(
