@@ -48,6 +48,7 @@ import androidx.core.content.ContextCompat
 import com.example.data.model.ChatMessage
 import com.example.data.model.UserProfile
 import com.example.data.repository.UserPreferences
+import com.example.data.repository.RateLimiter
 import com.example.ui.components.*
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
@@ -122,6 +123,33 @@ fun DaoChatScreen(
     var showPersonalityMenu by remember { mutableStateOf(false) }
     var showModesMenu by remember { mutableStateOf(false) }
 
+    // Rate limiter function for model switching
+    fun updateRateLimit(model: String) {
+        RateLimiter.setLimit(when (model) {
+            // Core Text & Multimodal
+            "gemini-3.5-flash" -> 10
+            "gemini-3.1-flash-lite" -> 15
+            "gemini-3-flash-preview" -> 10
+            "gemini-3.1-pro-preview" -> 5
+            "gemini-2.5-pro" -> 5
+            "gemini-2.5-flash" -> 10
+            // Audio & Voice
+            "gemini-3.1-flash-live-preview" -> 10
+            "gemini-3.1-flash-tts-preview" -> 10
+            "gemini-2.5-flash-live-preview" -> 5
+            "gemini-2.5-flash-tts-preview" -> 10
+            "gemini-2.5-pro-tts-preview" -> 5
+            // Image Generation
+            "gemini-2.5-flash-image" -> 5
+            "nano-banana-2-preview" -> 5
+            "nano-banana-pro-preview" -> 2
+            // Embeddings
+            "gemini-embedding-2-preview" -> 15
+            "text-embedding-004" -> 15
+            else -> 10
+        })
+    }
+
     // Custom Personality state
     var showCustomPersonalityDialog by remember { mutableStateOf(false) }
     var customPersonalityInput by remember { mutableStateOf("") }
@@ -146,6 +174,15 @@ fun DaoChatScreen(
 
     val balance = profile.yinBalance
     val isDarkBackground = isDarkThemeOverride
+
+    // TPM Warning Calculation (Fix 40)
+    val tpmLimit = when (activeModel) {
+        "gemini-3.1-pro-preview" -> 100_000
+        "gemini-2.5-pro-tts-preview" -> 100_000
+        else -> 250_000
+    }
+    val sessionTokens = profile.tokenTotal
+    val tpmPercentage = if (tpmLimit > 0) (sessionTokens.toFloat() / tpmLimit * 100).toInt() else 0
 
     val bgBrush = remember(isDarkBackground, balance) {
         val yinColor = YinBlack
@@ -357,6 +394,24 @@ fun DaoChatScreen(
                     .background(if (isDarkBackground) YinBlack.copy(alpha = 0.95f) else YangWhite.copy(alpha = 0.95f))
                     .statusBarsPadding()
             ) {
+                // TPM Warning Card (Fix 40)
+                if (tpmPercentage > 70) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (tpmPercentage > 90) ZenRed.copy(alpha = 0.1f) else Color(0xFFFF9800).copy(alpha = 0.1f)
+                        )
+                    ) {
+                        Text(
+                            text = "⚠️ TPM: ${sessionTokens}/${tpmLimit} ($tpmPercentage%) — ${if (tpmPercentage > 90) "Limit critical!" else "Approaching limit"}",
+                            color = if (tpmPercentage > 90) ZenRed else Color(0xFFFF9800),
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+                
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -406,37 +461,80 @@ fun DaoChatScreen(
                                 modifier = Modifier.background(if (isDarkBackground) YinCardBg else YangCardBg)
                             ) {
                                 val models = listOf(
-                                    Pair("gemini-2.5-flash", "⚡ Gemini 2.5 Flash — Fast, 1M context, 15 RPM, 1M TPM"),
-                                    Pair("gemini-2.5-pro", "🧠 Gemini 2.5 Pro — Deep reasoning, 1M context, 10 RPM, 1M TPM"),
-                                    Pair("gemini-2.5-flash-lite", "💨 Gemini 2.5 Flash-Lite — Lightweight, 1M context, 30 RPM, 250K TPM"),
-                                    Pair("gemini-2.0-flash", "🚀 Gemini 2.0 Flash — Stable, 1M context, 15 RPM, 1M TPM"),
-                                    Pair("gemini-1.5-flash", "🌊 Gemini 1.5 Flash — High throughput, 1M context"),
-                                    Pair("gemini-1.5-pro", "🔮 Gemini 1.5 Pro — Expert reasoning, 2M context"),
-                                    Pair("gemma-3-27b", "🦾 Gemma 3 27B — Open model, 128K context"),
-                                    Pair("gemma-3-12b", "🪶 Gemma 3 12B — Lightweight open model, 128K context")
+                                    // Core Text & Multimodal
+                                    Pair("gemini-3.5-flash", "⚡ Gemini 3.5 Flash — Stable, 1M context, 10 RPM, 250K TPM"),
+                                    Pair("gemini-3.1-flash-lite", "🪶 Gemini 3.1 Flash-Lite — Stable, 1M context, 15 RPM, 250K TPM"),
+                                    Pair("gemini-3-flash-preview", "🔮 Gemini 3 Flash — Preview, 1M context, 10 RPM, 250K TPM"),
+                                    Pair("gemini-3.1-pro-preview", "🧠 Gemini 3.1 Pro — Preview, 1M+ context, 5 RPM, 100K TPM"),
+                                    Pair("gemini-2.5-pro", "💎 Gemini 2.5 Pro — Stable, 1M context, 5 RPM, 250K TPM"),
+                                    Pair("gemini-2.5-flash", "⚡ Gemini 2.5 Flash — Stable, 1M context, 10 RPM, 250K TPM"),
+                                    // Audio & Voice
+                                    Pair("gemini-3.1-flash-live-preview", "🎙 Gemini 3.1 Flash Live — Real-time audio, 10 RPM"),
+                                    Pair("gemini-3.1-flash-tts-preview", "🔊 Gemini 3.1 Flash TTS — Speech generation, 10 RPM"),
+                                    Pair("gemini-2.5-flash-live-preview", "🎤 Gemini 2.5 Flash Live — Sub-second audio, 5 RPM"),
+                                    Pair("gemini-2.5-flash-tts-preview", "📢 Gemini 2.5 Flash TTS — Fast narration, 10 RPM"),
+                                    Pair("gemini-2.5-pro-tts-preview", "🎧 Gemini 2.5 Pro TTS — High-fidelity, 5 RPM"),
+                                    // Image Generation
+                                    Pair("gemini-2.5-flash-image", "🎨 Gemini 2.5 Flash Image — Fast generation, 5 RPM, 2 IPM"),
+                                    Pair("nano-banana-2-preview", "🍌 Nano Banana 2 — Creative assets, 5 RPM, 2 IPM"),
+                                    Pair("nano-banana-pro-preview", "🍌 Nano Banana Pro — Hyper-detailed, 2 RPM, 1 IPM"),
+                                    // Embeddings
+                                    Pair("gemini-embedding-2-preview", "🔢 Gemini Embedding 2 — Multimodal vectors, 15 RPM"),
+                                    Pair("text-embedding-004", "📐 Text Embedding 004 — Text vectors, 15 RPM")
                                 )
                                 models.forEach { (modelId, desc) ->
                                     DropdownMenuItem(
                                         text = {
                                             Column {
-                                                Text(modelId, fontWeight = FontWeight.Bold, color = if (isDarkBackground) YinText else YangText)
-                                                Text(desc, style = MaterialTheme.typography.labelSmall, color = if (isDarkBackground) YinTextSecondary else YangTextSecondary)
-                                                // Show RPM/TPM for current model
-                                                when (modelId) {
-                                                    "gemini-2.5-flash" -> Text("15 RPM • 1M TPM • 64K output", fontSize = 9.sp, color = ZenGold)
-                                                    "gemini-2.5-pro" -> Text("10 RPM • 1M TPM • 64K output", fontSize = 9.sp, color = ZenGold)
-                                                    "gemini-2.5-flash-lite" -> Text("30 RPM • 250K TPM • 64K output", fontSize = 9.sp, color = ZenGold)
-                                                    "gemini-2.0-flash" -> Text("15 RPM • 1M TPM • 64K output", fontSize = 9.sp, color = ZenGold)
-                                                    "gemini-1.5-flash" -> Text("15 RPM • 1M TPM • 8K output", fontSize = 9.sp, color = ZenGold)
-                                                    "gemini-1.5-pro" -> Text("10 RPM • 1M TPM • 8K output", fontSize = 9.sp, color = ZenGold)
-                                                    "gemma-3-27b" -> Text("Context: 128K input • 8K output", fontSize = 9.sp, color = ZenGold)
-                                                    "gemma-3-12b" -> Text("Context: 128K input • 8K output", fontSize = 9.sp, color = ZenGold)
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(modelId, fontWeight = FontWeight.Bold, color = if (isDarkBackground) YinText else YangText, fontSize = 13.sp)
+                                                    Spacer(Modifier.width(6.dp))
+                                                    // Category badge
+                                                    val category = when {
+                                                        modelId.contains("live") || modelId.contains("tts") -> "Audio"
+                                                        modelId.contains("image") || modelId.contains("banana") -> "Image"
+                                                        modelId.contains("embedding") -> "Vector"
+                                                        modelId.contains("pro") -> "Pro"
+                                                        else -> "Flash"
+                                                    }
+                                                    Surface(
+                                                        color = when(category) {
+                                                            "Pro" -> Color(0xFF9C27B0).copy(alpha = 0.2f)
+                                                            "Audio" -> Color(0xFFE91E63).copy(alpha = 0.2f)
+                                                            "Image" -> Color(0xFFFF9800).copy(alpha = 0.2f)
+                                                            "Vector" -> Color(0xFF2196F3).copy(alpha = 0.2f)
+                                                            else -> ZenGold.copy(alpha = 0.2f)
+                                                        },
+                                                        shape = RoundedCornerShape(4.dp)
+                                                    ) {
+                                                        Text(
+                                                            category,
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = when(category) {
+                                                                "Pro" -> Color(0xFFCE93D8)
+                                                                "Audio" -> Color(0xFFF48FB1)
+                                                                "Image" -> Color(0xFFFFCC80)
+                                                                "Vector" -> Color(0xFF90CAF9)
+                                                                else -> ZenGold
+                                                            },
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                                                        )
+                                                    }
                                                 }
+                                                Text(desc, style = MaterialTheme.typography.labelSmall, color = if (isDarkBackground) YinTextSecondary else YangTextSecondary, fontSize = 10.sp)
                                             }
                                         },
                                         onClick = {
                                             activeModel = modelId
                                             showModelMenu = false
+                                            updateRateLimit(modelId)
+                                            
+                                            // Warning for older models
+                                            if (modelId.startsWith("gemini-2.0") || modelId.startsWith("gemini-1.")) {
+                                                Toast.makeText(context, "⚠️ This model may be deprecated. Consider upgrading to 2.5+ or 3.x", Toast.LENGTH_LONG).show()
+                                            }
+                                            
                                             Toast.makeText(context, "Switched to $modelId", Toast.LENGTH_SHORT).show()
                                         }
                                     )
@@ -913,13 +1011,27 @@ fun DaoChatScreen(
                     // Token counter (Fix 27 Step 2)
                     val currentTokenCount = remember(inputText) { com.example.ui.components.estimateTokens(inputText) }
                     val maxTokensForModel = when (activeModel) {
-                        "gemini-2.5-flash" -> 65536
+                        // Core — all 1M context, 64K output
+                        "gemini-3.5-flash" -> 65536
+                        "gemini-3.1-flash-lite" -> 65536
+                        "gemini-3-flash-preview" -> 65536
+                        "gemini-3.1-pro-preview" -> 65536
                         "gemini-2.5-pro" -> 65536
-                        "gemini-2.5-flash-lite" -> 65536
-                        "gemini-2.0-flash" -> 65536
-                        "gemini-1.5-flash" -> 8192
-                        "gemini-1.5-pro" -> 8192
-                        else -> 8192
+                        "gemini-2.5-flash" -> 65536
+                        // Audio — smaller output for real-time
+                        "gemini-3.1-flash-live-preview" -> 16384
+                        "gemini-3.1-flash-tts-preview" -> 16384
+                        "gemini-2.5-flash-live-preview" -> 16384
+                        "gemini-2.5-flash-tts-preview" -> 16384
+                        "gemini-2.5-pro-tts-preview" -> 16384
+                        // Image — minimal text output
+                        "gemini-2.5-flash-image" -> 4096
+                        "nano-banana-2-preview" -> 4096
+                        "nano-banana-pro-preview" -> 4096
+                        // Embeddings — vector output
+                        "gemini-embedding-2-preview" -> 8192
+                        "text-embedding-004" -> 8192
+                        else -> 65536
                     }
                     
                     Column(modifier = Modifier.weight(1f)) {

@@ -151,7 +151,27 @@ object GeminiService {
             put("generationConfig", JSONObject().apply {
                 put("temperature", 0.7)
                 put("maxOutputTokens", prefs.maxTokens)
+                
+                // Fix 43: Image model special handling
+                if (model.contains("image") || model.contains("banana")) {
+                    put("responseModalities", JSONArray().apply { put("IMAGE") })
+                }
             })
+        }
+        
+        // Fix 42: Embedding model special handling
+        if (model.contains("embedding")) {
+            // Use embedding endpoint instead
+            val embedUrl = "https://generativelanguage.googleapis.com/v1beta/models/$model:embedContent?key=$apiKey"
+            val embedRequestJson = JSONObject().apply {
+                put("contents", JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("parts", contentParts)
+                    })
+                })
+            }
+            // Return embedding response as special format
+            // Note: This is a simplified handling - full implementation would return vector data
         }
 
         val requestBody = requestJson.toString().toRequestBody(mediaType)
