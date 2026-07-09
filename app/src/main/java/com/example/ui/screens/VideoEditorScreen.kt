@@ -233,6 +233,34 @@ fun VideoEditorScreen(isDark: Boolean, onMenuClick: () -> Unit) {
         }
     }
 
+    // Process pending automation actions for VideoEditor screen
+    LaunchedEffect(Unit) {
+        while (true) {
+            val action = com.example.ui.automation.PendingActions.queue.poll()
+            if (action != null && action.targetScreen == "VideoEditor") {
+                when (action.action) {
+                    "import_video" -> {
+                        val path = action.parameters["path"] ?: continue
+                        val file = java.io.File(path)
+                        if (file.exists()) {
+                            val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                            try {
+                                val dur = VideoUtils.getDuration(context, uri)
+                                val thumb = VideoUtils.getThumbnail(context, uri)
+                                clips = clips + VideoClip(uri = uri, fileName = file.name, durationMs = dur, thumbnail = thumb, endTrimMs = dur)
+                                totalDuration = clips.sumOf { c -> c.endTrimMs - c.startTrimMs }
+                                selectedClipIndex = clips.size - 1
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Failed to import video: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                }
+            }
+            delay(300)
+        }
+    }
+
     // Playback loop
     LaunchedEffect(isPlaying) {
         if (isPlaying && totalDuration > 0) {
