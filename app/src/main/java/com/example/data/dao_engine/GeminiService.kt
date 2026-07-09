@@ -87,10 +87,7 @@ object GeminiService {
             Keep your wisdom aligned, clear, and mystical yet helpful. Respond directly to the user.
         """.trimIndent()
         } else if (mode == "Automation" || mode == "Agent") {
-            com.example.ui.automation.AutomationEngine.getAutomationSystemPrompt(
-                listOf("web_search", "github_create_repo", "telegram_send", "file_read", "screen_capture", 
-                       "browser_navigate", "file_compress", "screen_navigate", "ui_tap", "ui_scroll", 
-                       "ui_type", "ui_back", "ui_read_screen")
+            com.example.ui.automation.AutomationEngine.getSystemPrompt(prompt)
             )
         } else {
             """
@@ -279,10 +276,7 @@ object GeminiService {
             Keep your wisdom aligned, clear, and mystical yet helpful. Respond directly to the user.
         """.trimIndent()
         } else if (mode == "Automation" || mode == "Agent") {
-            com.example.ui.automation.AutomationEngine.getAutomationSystemPrompt(
-                listOf("web_search", "github_create_repo", "telegram_send", "file_read", "screen_capture", 
-                       "browser_navigate", "file_compress", "screen_navigate", "ui_tap", "ui_scroll", 
-                       "ui_type", "ui_back", "ui_read_screen")
+            com.example.ui.automation.AutomationEngine.getSystemPrompt(prompt)
             )
         } else {
             """

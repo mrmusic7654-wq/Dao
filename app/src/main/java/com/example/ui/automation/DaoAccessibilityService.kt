@@ -91,6 +91,48 @@ class DaoAccessibilityService : AccessibilityService() {
             }
         }
     }
+
+    fun findAndLongPress(text: String): Boolean {
+        val root = rootInActiveWindow ?: return false
+        val nodes = root.findAccessibilityNodeInfosByText(text)
+        for (node in nodes) {
+            if (node.isLongClickable) {
+                node.performAction(AccessibilityNodeInfo.ACTION_LONG_CLICK)
+                return true
+            }
+        }
+        return false
+    }
+
+    fun scrollBackward(): Boolean {
+        val root = rootInActiveWindow ?: return false
+        val scrollables = findScrollables(root)
+        for (node in scrollables) {
+            node.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
+            return true
+        }
+        return false
+    }
+
+    fun swipeLeft(): Boolean {
+        return performGlobalAction(GLOBAL_ACTION_BACK)
+    }
+
+    fun swipeRight(): Boolean {
+        val root = rootInActiveWindow ?: return false
+        return performGlobalAction(GLOBAL_ACTION_HOME)
+    }
+
+    private fun findScrollables(node: AccessibilityNodeInfo): List<AccessibilityNodeInfo> {
+        val result = mutableListOf<AccessibilityNodeInfo>()
+        if (node.isScrollable) result.add(node)
+        for (i in 0 until node.childCount) {
+            node.getChild(i)?.let { child ->
+                result.addAll(findScrollables(child))
+            }
+        }
+        return result
+    }
 }
 
 data class UiAction(
