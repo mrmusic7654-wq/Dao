@@ -10,6 +10,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.ConcurrentLinkedQueue
+
+data class PendingAction(
+    val targetScreen: String,
+    val action: String,
+    val parameters: Map<String, String> = emptyMap()
+)
+
+object PendingActions {
+    val queue = ConcurrentLinkedQueue<PendingAction>()
+}
 
 object AutomationEngine {
 
@@ -81,38 +92,24 @@ object AutomationEngine {
             }
             "browser_navigate" -> {
                 val url = parameters["url"] ?: return@withContext "Missing URL"
+                // Store pending action for when screen opens
+                PendingActions.queue.add(PendingAction("Browser", "load_url", mapOf("url" to url)))
+                // Navigate
                 withContext(Dispatchers.Main) {
                     ScreenNavigator.navigateTo(Screen.Browser)
                 }
-                delay(1000)
-                AutomationEventBus.sendEvent(
-                    AutomationEventBus.AutomationEvent(
-                        targetScreen = "Browser",
-                        action = "load_url",
-                        parameters = mapOf("url" to url),
-                        requestId = parameters["requestId"] ?: ""
-                    )
-                )
-                "Browser opened, navigating to $url"
+                "Opening Browser and navigating to $url"
             }
             "file_compress" -> {
                 val path = parameters["path"] ?: return@withContext "Missing path"
+                PendingActions.queue.add(PendingAction("FileManager", "compress", mapOf("path" to path)))
                 withContext(Dispatchers.Main) {
                     ScreenNavigator.navigateTo(Screen.FileManager)
                 }
-                delay(500)
-                AutomationEventBus.sendEvent(
-                    AutomationEventBus.AutomationEvent(
-                        targetScreen = "FileManager",
-                        action = "compress",
-                        parameters = mapOf("path" to path),
-                        requestId = parameters["requestId"] ?: ""
-                    )
-                )
-                "File compression started for $path"
+                "Opening File Manager to compress $path"
             }
             "screen_navigate" -> {
-                val screenName = parameters["screen"] ?: return@withContext "Missing screen name"
+                val screenName = parameters["screen"] ?: return@withContext "Missing screen"
                 val screen = when (screenName.lowercase()) {
                     "browser" -> Screen.Browser
                     "filemanager" -> Screen.FileManager
@@ -120,21 +117,12 @@ object AutomationEngine {
                     "codeeditor" -> Screen.CodeEditor
                     "github" -> Screen.GitHub
                     "telegram" -> Screen.Telegram
-                    "imageeditor" -> Screen.ImageEditor
-                    "documentscanner" -> Screen.DocumentScanner
-                    "cloudstoragehub" -> Screen.CloudStorageHub
-                    "passwordvault" -> Screen.PasswordVault
-                    "notesmanager" -> Screen.NotesManager
-                    "terminalemulator" -> Screen.TerminalEmulator
-                    "automationdashboard" -> Screen.AutomationDashboard
-                    "screenrecorder" -> Screen.ScreenRecorder
-                    "daochat" -> Screen.DaoChat
-                    else -> return@withContext "Unknown screen: $screenName"
+                    else -> Screen.DaoChat
                 }
                 withContext(Dispatchers.Main) {
                     ScreenNavigator.navigateTo(screen)
                 }
-                "Opened screen: $screenName"
+                "Opened $screenName"
             }
             else -> "Unknown action: $action"
         }
