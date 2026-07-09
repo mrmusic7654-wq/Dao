@@ -48,6 +48,7 @@ import kotlinx.coroutines.delay
 import java.io.*
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.LinkedList
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
@@ -62,7 +63,8 @@ data class FileItem(
     val lastModified: Long = file.lastModified(),
     val extension: String = file.extension.lowercase(),
     val isHidden: Boolean = file.name.startsWith("."),
-    val containsImages: Boolean = false
+    val containsImages: Boolean = false,
+    val folderSize: Long? = null // For calculated folder sizes
 )
 
 enum class FileSortMode { NAME, DATE, SIZE, TYPE }
@@ -75,6 +77,13 @@ data class StorageInfo(
     val freeSpace: Long,
     val usedSpace: Long,
     val name: String
+)
+
+data class ApkInfo(
+    val packageName: String,
+    val versionName: String,
+    val versionCode: Long,
+    val appName: String
 )
 
 // ==================== FILE UTILS ====================
@@ -215,6 +224,103 @@ object FileUtils {
             bytes.joinToString(" ") { String.format("%02X", it) }
         } catch (e: Exception) { "Cannot read file" }
     }
+
+    fun readTextFile(file: File, maxBytes: Int = 50000): String {
+        return try {
+            file.inputStream().use { it.readBytes().take(maxBytes).toByteArray().toString(Charsets.UTF_8) }
+        } catch (e: Exception) { "Cannot read file: ${e.message}" }
+    }
+
+    fun calculateChecksum(file: File, algorithm: String = "MD5"): String {
+        return try {
+            val digest = java.security.MessageDigest.getInstance(algorithm)
+            file.inputStream().use { input ->
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    digest.update(buffer, 0, bytesRead)
+                }
+            }
+            digest.digest().joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) { "Error: ${e.message}" }
+    }
+
+    fun verifyChecksum(file: File, expectedHash: String, algorithm: String = "MD5"): Boolean {
+        val actual = calculateChecksum(file, algorithm)
+        return actual.equals(expectedHash, ignoreCase = true)
+    }
+
+    fun calculateFolderSize(folder: File): Long {
+        var totalSize = 0L
+        val queue = LinkedList<File>()
+        queue.add(folder)
+        while (queue.isNotEmpty()) {
+            val current = queue.poll()
+            if (current.isDirectory) {
+                current.listFiles()?.forEach { queue.add(it) }
+            } else {
+                totalSize += current.length()
+            }
+        }
+        return totalSize
+    }
+
+    fun getApkInfo(context: Context, apkPath: String): ApkInfo? {
+        return try {
+            val pm = context.packageManager
+            val packageInfo = pm.getPackageArchiveInfo(apkPath, android.content.pm.PackageManager.GET_ACTIVITIES)
+            packageInfo?.let {
+                val appInfo = it.applicationInfo
+                appInfo.sourceDir = apkPath
+                appInfo.publicSourceDir = apkPath
+                ApkInfo(
+                    packageName = it.packageName,
+                    versionName = it.versionName ?: "Unknown",
+                    versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) it.longVersionCode else it.versionCode.toLong(),
+                    appName = pm.getApplicationLabel(appInfo).toString()
+                )
+            }
+        } catch (e: Exception) { null }
+    }
+}
+
+// ==================== FAVORITES MANAGER ====================
+
+object FavoritesManager {
+    private val favorites = mutableSetOf<String>()
+
+    fun getFavorites(): List<String> = favorites.toList()
+
+    fun addFavorite(path: String) {
+        favorites.add(path)
+    }
+
+    fun removeFavorite(path: String) {
+        favorites.remove(path)
+    }
+
+    fun isFavorite(path: String): Boolean = path in favorites
+
+    fun toggleFavorite(path: String) {
+        if (isFavorite(path)) removeFavorite(path) else addFavorite(path)
+    }
+}
+
+// ==================== RECENT FILES ====================
+
+object RecentFiles {
+    private val recentFiles = mutableListOf<String>()
+    private const val maxRecent = 20
+
+    fun addRecent(path: String) {
+        recentFiles.remove(path)
+        recentFiles.add(0, path)
+        if (recentFiles.size > maxRecent) recentFiles.removeAt(maxRecent)
+    }
+
+    fun getRecent(): List<String> = recentFiles.toList()
+
+    fun clearRecent() { recentFiles.clear() }
 }
 
 // ==================== FILE MANAGER SCREEN ====================
@@ -616,6 +722,16 @@ fun FileManagerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
     }
 
     showFileInfoDialog?.let { fileItem ->
+        var checksumMd5 by remember { mutableStateOf("") }
+        var isCalculatingChecksum by remember { mutableStateOf(false) }
+        var apkInfo by remember { mutableStateOf<ApkInfo?>(null) }
+        
+        LaunchedEffect(fileItem) {
+            if (!fileItem.isDirectory && fileItem.extension == "apk") {
+                apkInfo = FileUtils.getApkInfo(context, fileItem.file.absolutePath)
+            }
+        }
+        
         AlertDialog(
             onDismissRequest = { showFileInfoDialog = null },
             title = { Text("File Info", color = ZenGold) },
@@ -625,6 +741,42 @@ fun FileManagerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                     InfoRow("Type", if (fileItem.isDirectory) "Folder" else fileItem.extension.uppercase())
                     InfoRow("Size", if (fileItem.isDirectory) "${fileItem.file.listFiles()?.size ?: 0} items" else FileUtils.formatSize(fileItem.size))
                     InfoRow("Modified", FileUtils.formatDate(fileItem.lastModified))
+                    
+                    // APK Info section
+                    if (fileItem.extension == "apk") {
+                        Divider(color = Color(0xFF333340))
+                        Text("📱 APK Information", color = ZenGold, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        apkInfo?.let { info ->
+                            InfoRow("App Name", info.appName)
+                            InfoRow("Package", info.packageName)
+                            InfoRow("Version", "${info.versionName} (${info.versionCode})")
+                        } ?: Text("Loading APK info...", color = YinTextSecondary, fontSize = 11.sp)
+                    }
+                    
+                    // Checksum section
+                    if (!fileItem.isDirectory) {
+                        Divider(color = Color(0xFF333340))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("MD5 Checksum:", color = YinTextSecondary, fontSize = 11.sp)
+                            if (isCalculatingChecksum) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = ZenGold, strokeWidth = 2.dp)
+                            } else if (checksumMd5.isNotEmpty()) {
+                                Text(checksumMd5.take(16) + "...", color = ZenGold, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                            }
+                        }
+                        Button(onClick = {
+                            isCalculatingChecksum = true
+                            CoroutineScope(Dispatchers.IO).launch {
+                                checksumMd5 = FileUtils.calculateChecksum(fileItem.file, "MD5")
+                                withContext(Dispatchers.Main) { isCalculatingChecksum = false }
+                            }
+                        }, colors = ButtonDefaults.buttonColors(containerColor = YinCardBg), modifier = Modifier.fillMaxWidth()) { 
+                            Text("🔐 Calculate MD5", color = YinText) 
+                        }
+                        Button(onClick = { hexContent = FileUtils.readHexDump(fileItem.file); showHexViewer = fileItem; showFileInfoDialog = null },
+                            colors = ButtonDefaults.buttonColors(containerColor = YinCardBg), modifier = Modifier.fillMaxWidth()) { Text("🔍 Hex Viewer", color = YinText) }
+                    }
+                    
                     if (fileItem.extension in listOf("zip", "rar", "7z")) {
                         if (fileItem.containsImages) {
                             Button(onClick = {
@@ -644,10 +796,6 @@ fun FileManagerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                             }
                             showFileInfoDialog = null
                         }, colors = ButtonDefaults.buttonColors(containerColor = ZenGold), modifier = Modifier.fillMaxWidth()) { Text("Extract", color = Color.Black) }
-                    }
-                    if (!fileItem.isDirectory) {
-                        Button(onClick = { hexContent = FileUtils.readHexDump(fileItem.file); showHexViewer = fileItem; showFileInfoDialog = null },
-                            colors = ButtonDefaults.buttonColors(containerColor = YinCardBg), modifier = Modifier.fillMaxWidth()) { Text("🔍 Hex Viewer", color = YinText) }
                     }
                 }
             },
@@ -987,5 +1135,133 @@ private fun BottomActionButton(label: String, icon: androidx.compose.ui.graphics
         modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 4.dp)) {
         Icon(icon, label, tint = color, modifier = Modifier.size(22.dp))
         Text(label, color = color, fontSize = 10.sp)
+    }
+}
+
+// ==================== CONTEXT MENU (ZArchiver-style long press) ====================
+
+@Composable
+fun FileContextMenu(
+    file: FileItem,
+    onDismiss: () -> Unit,
+    onOpen: () -> Unit,
+    onCopy: () -> Unit,
+    onMove: () -> Unit,
+    onDelete: () -> Unit,
+    onRename: () -> Unit,
+    onProperties: () -> Unit,
+    onCompress: () -> Unit,
+    onShare: () -> Unit,
+    onChecksum: () -> Unit,
+    onAddFavorite: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(file.name, color = ZenGold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        text = {
+            Column {
+                ContextMenuItem("Open", Icons.Default.OpenInNew, onOpen)
+                ContextMenuItem("Copy", Icons.Default.ContentCopy, onCopy)
+                ContextMenuItem("Move", Icons.Default.DriveFileMove, onMove)
+                ContextMenuItem("Delete", Icons.Default.Delete, onDelete, ZenRed)
+                ContextMenuItem("Rename", Icons.Default.Edit, onRename)
+                ContextMenuItem("Compress", Icons.Default.Archive, onCompress)
+                ContextMenuItem("Share", Icons.Default.Share, onShare)
+                ContextMenuItem("Checksum", Icons.Default.Security, onChecksum)
+                ContextMenuItem("Properties", Icons.Default.Info, onProperties)
+                ContextMenuItem(
+                    if (FavoritesManager.isFavorite(file.file.absolutePath)) "Remove Favorite" else "Add to Favorites",
+                    Icons.Default.Star, onAddFavorite
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+    )
+}
+
+@Composable
+fun ContextMenuItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit, color: Color = YinText) {
+    Row(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = {}).padding(vertical = 10.dp, horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(label, color = color, fontSize = 14.sp)
+    }
+}
+
+// ==================== FAVORITES SIDEBAR ====================
+
+@Composable
+fun FavoritesSidebar(
+    favorites: List<String>,
+    onNavigate: (String) -> Unit,
+    onRemove: (String) -> Unit
+) {
+    Column {
+        Text("⭐ Favorites", color = ZenGold, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+        favorites.forEach { path ->
+            Row(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = { onNavigate(path) }, onLongClick = {}).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Star, null, tint = ZenGold, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(File(path).name, color = YinText, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                IconButton(onClick = { onRemove(path) }, modifier = Modifier.size(20.dp)) {
+                    Icon(Icons.Default.Close, null, tint = YinTextSecondary.copy(alpha = 0.5f), modifier = Modifier.size(12.dp))
+                }
+            }
+        }
+    }
+}
+
+// ==================== BATCH RENAME DIALOG ====================
+
+@Composable
+fun BatchRenameDialog(
+    files: List<FileItem>,
+    onDismiss: () -> Unit,
+    onRename: (String, Int) -> Unit
+) {
+    var prefix by remember { mutableStateOf("") }
+    var startNumber by remember { mutableIntStateOf(1) }
+    val extension = files.firstOrNull()?.extension ?: ""
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Batch Rename ${files.size} files", color = ZenGold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = prefix, onValueChange = { prefix = it }, label = { Text("Prefix") })
+                OutlinedTextField(value = startNumber.toString(), onValueChange = { startNumber = it.toIntOrNull() ?: 1 },
+                    label = { Text("Start number") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                OutlinedTextField(value = extension, onValueChange = { /* extension is auto-detected */ }, label = { Text("Extension (auto)") }, enabled = false)
+                Text("Example: ${prefix}${startNumber}.${extension}", color = YinTextSecondary, fontSize = 11.sp)
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                files.forEachIndexed { index, file ->
+                    val newName = "$prefix${startNumber + index}.$extension"
+                    val newFile = File(file.file.parent, newName)
+                    file.file.renameTo(newFile)
+                }
+                onDismiss()
+            }) { Text("Rename All") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+// ==================== DUAL PANE TOGGLE BUTTON ====================
+
+@Composable
+fun DualPaneToggle(
+    isDualPane: Boolean,
+    onToggle: () -> Unit
+) {
+    IconButton(onClick = onToggle) {
+        Icon(
+            if (isDualPane) Icons.Default.ViewColumn else Icons.Default.ViewAgenda,
+            contentDescription = "Toggle dual pane",
+            tint = if (isDualPane) ZenGold else YinTextSecondary
+        )
     }
 }
