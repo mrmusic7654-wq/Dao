@@ -388,4 +388,71 @@ object GeminiService {
             )
         }
     }
+
+    suspend fun generateResponse(
+        context: Context,
+        prompt: String,
+        personality: String,
+        mode: String,
+        preferOffline: Boolean = false
+    ): DaoResponse = withContext(Dispatchers.IO) {
+        val localEngine = LocalInferenceEngine(context)
+
+        if (preferOffline && localEngine.isAvailable()) {
+            val localResponse = localEngine.generate(prompt)
+            return@withContext DaoResponse(
+                replyText = localResponse,
+                yinImpact = 0.5f,
+                yangImpact = 0.5f,
+                xpReward = 5,
+                specialMessage = "Local AI (Offline)"
+            )
+        }
+
+        // Fall back to cloud API
+        generateResponse(context, prompt, personality, mode, null)
+    }
+
+    suspend fun generateTTS(
+        context: Context,
+        text: String,
+        model: String = "gemini-2.5-flash-tts-preview"
+    ): ByteArray? = withContext(Dispatchers.IO) {
+        val prefs = UserPreferences(context)
+        val apiKey = prefs.geminiApiKey
+        if (apiKey.isBlank()) return@withContext null
+
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+        val json = JSONObject().apply {
+            put("contents", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("parts", JSONArray().apply {
+                        put(JSONObject().apply { put("text", "Read this aloud naturally: $text") })
+                    })
+                })
+            })
+            put("generationConfig", JSONObject().apply {
+                put("responseModalities", JSONArray().apply { put("AUDIO") })
+            })
+        }
+
+        try {
+            val requestBody = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+            val request = Request.Builder().url(url).post(requestBody).build()
+            val response = OkHttpClient().newCall(request).execute()
+            val body = response.body?.string() ?: return@withContext null
+            val resultJson = JSONObject(body)
+            val audioBase64 = resultJson.optJSONArray("candidates")
+                ?.optJSONObject(0)
+                ?.optJSONObject("content")
+                ?.optJSONArray("parts")
+                ?.optJSONObject(0)
+                ?.optString("inlineData", "")
+                ?.let { it.substringAfter("base64,") }
+
+            audioBase64?.let { java.util.Base64.getDecoder().decode(it) }
+        } catch (e: Exception) {
+            null
+        }
+    }
 }

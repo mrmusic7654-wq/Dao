@@ -82,7 +82,9 @@ dependencies {
   // Jsoup for web scraping
   implementation("org.jsoup:jsoup:1.17.2")
   // Biometric
-implementation("androidx.biometric:biometric:1.1.0")
+  implementation("androidx.biometric:biometric:1.1.0")
+  // MediaPipe for on-device AI (Enhancement 9: Offline-First AI)
+  implementation("com.google.mediapipe:tasks-genai:0.10.14")
   // UI Automator for human-like interaction (tap, scroll, type, read screen)
   implementation("androidx.test.uiautomator:uiautomator:2.2.0")
   implementation(platform(libs.androidx.compose.bom))
