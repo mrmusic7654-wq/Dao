@@ -1,21 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <external-path
-        name="downloads"
-        path="Download/Dao/" />
-    <external-path
-        name="videos"
-        path="Movies/Dao/" />
-    <external-path
-        name="external_root"
-        path="." />
-    <files-path
-        name="internal_downloads"
-        path="Download/Dao/" />
-    <files-path
-        name="internal_videos"
-        path="Movies/Dao/" />
-    <cache-path
-        name="cache"
-        path="." />
+    <external-path name="downloads" path="Download/Dao/" />
+    <external-path name="videos" path="Movies/Dao/" />
+    <external-path name="documents" path="Documents/Dao/" />
+    <external-path name="pictures" path="Pictures/Dao/" />
+    <external-path name="external_root" path="." />
+    <files-path name="internal_downloads" path="Download/Dao/" />
+    <files-path name="internal_videos" path="Movies/Dao/" />
+    <cache-path name="cache" path="." />
 </paths>

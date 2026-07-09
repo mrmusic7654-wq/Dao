@@ -6,47 +6,38 @@
 *.aar
 *.apk
 *.jar
-obj/
+
 # Dependencies
-node_modules/
-.gradle/
+.libs/
+lib/
+external/
+
 # Build outputs
 build/
 .externalNativeBuild/
-.cxx/
-# IDE files
+.intermediates/
+.packaged/
+outputs/
+
+# Gradle
+.gradle/
+.gradle-wrapper/
+
+# IDE
 .idea/
 *.iml
+*.ipr
 *.iws
 .vscode/
+.settings/
+.project
+
 # Temp files
 *.tmp
 *.temp
-# Environment
-.env
-.env.local
-.env.*
-# Logs
 *.log
-# Coverage
-coverage/
-htmlcov/
-.coverage
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-# Distribution / packaging
-.dist-info/
-*.egg-info/
-.installed.cfg
-*.egg
-# Unit test / coverage reports
-.junit
-.pytest_cache/
-.mypy_cache/
-# Local configuration file (sdk path, etc)
+
+# Local configuration
 local.properties
+gradle.properties
 ```
