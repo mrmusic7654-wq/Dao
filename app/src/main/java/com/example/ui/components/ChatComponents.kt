@@ -30,6 +30,13 @@ import com.example.data.model.UserProfile
 import com.example.ui.theme.*
 import com.example.ui.util.buildFormattedAnnotatedString
 
+// Fix 1: Message Reactions data class
+data class MessageReaction(
+    val emoji: String,
+    val count: Int = 1,
+    val isUserReaction: Boolean = false
+)
+
 // Token estimation utility function (Fix 31)
 fun estimateTokens(text: String): Int {
     val words = text.split(Regex("\\s+")).filter { it.isNotBlank() }.size
@@ -624,6 +631,73 @@ fun ThinkingIndicatorBubble(isDark: Boolean) {
                         fontFamily = FontFamily.Serif
                     )
                 }
+            }
+        }
+    }
+}
+
+// Fix 1: Message Reactions component
+@Composable
+fun MessageReactions(
+    reactions: List<MessageReaction>,
+    onAddReaction: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (reactions.isEmpty()) return
+
+    Row(
+        modifier = modifier.padding(top = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        reactions.forEach { reaction ->
+            Surface(
+                color = if (reaction.isUserReaction) ZenGold.copy(alpha = 0.2f) else Color(0xFF333340),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.clickable { onAddReaction(reaction.emoji) }
+            ) {
+                Text(
+                    "${reaction.emoji} ${reaction.count}",
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+            }
+        }
+        // Add reaction button
+        Surface(
+            color = Color.Transparent,
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, Color(0xFF555560)),
+            modifier = Modifier.clickable { /* Show emoji picker */ }
+        ) {
+            Icon(Icons.Default.Add, null, tint = YinTextSecondary, modifier = Modifier.size(16.dp).padding(2.dp))
+        }
+    }
+}
+
+// Fix 2: Reply Preview component for message threading
+@Composable
+fun ReplyPreview(
+    repliedTo: ChatMessage?,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (repliedTo == null) return
+
+    Surface(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        color = Color(0xFF1A1A28),
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, ZenGold.copy(alpha = 0.3f))
+    ) {
+        Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.width(3.dp).height(30.dp).background(ZenGold))
+            Spacer(Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(if (repliedTo.isUser) "You" else "Dao", color = ZenGold, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                Text(repliedTo.content.take(80), color = YinTextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            IconButton(onClick = onCancel, modifier = Modifier.size(24.dp)) {
+                Icon(Icons.Default.Close, "Cancel reply", tint = YinTextSecondary, modifier = Modifier.size(16.dp))
             }
         }
     }

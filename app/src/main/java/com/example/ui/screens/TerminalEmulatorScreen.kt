@@ -58,6 +58,33 @@ data class CommandHistory(
     val directory: String = "/"
 )
 
+// Fix 4: Command Auto-Complete utility
+object CommandAutoComplete {
+    private val commonCommands = listOf(
+        "ls", "cd", "pwd", "cat", "echo", "mkdir", "rm", "cp", "mv",
+        "touch", "chmod", "chown", "grep", "find", "tar", "zip", "unzip",
+        "curl", "wget", "ping", "ifconfig", "netstat", "ps", "kill",
+        "df", "du", "free", "top", "htop", "nano", "vim", "git",
+        "github", "clear", "help", "exit", "history", "alias",
+        "python", "python3", "node", "npm", "java", "kotlin"
+    )
+
+    fun getSuggestions(input: String): List<String> {
+        if (input.isBlank()) return commonCommands.take(5)
+        return commonCommands.filter { it.startsWith(input) }
+    }
+
+    fun getPathSuggestions(input: String, currentDir: String): List<String> {
+        val path = input.substringBeforeLast("/", "")
+        val prefix = input.substringAfterLast("/", "")
+        val dir = if (path.startsWith("/")) File(path) else File(currentDir, path)
+        return dir.listFiles()
+            ?.filter { it.name.startsWith(prefix) }
+            ?.map { if (path.isEmpty()) it.name else "$path/${it.name}" }
+            ?.take(8) ?: emptyList()
+    }
+}
+
 data class CommandSuggestion(
     val command: String,
     val description: String,

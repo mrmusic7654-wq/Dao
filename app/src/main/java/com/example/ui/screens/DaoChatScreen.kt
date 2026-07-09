@@ -165,6 +165,9 @@ fun DaoChatScreen(
     // Voice/Mic State
     var isRecordingVoice by remember { mutableStateOf(false) }
 
+    // Fix 2: Message threading - reply state
+    var replyingTo by remember { mutableStateOf<ChatMessage?>(null) }
+
     // Auto scroll to bottom when messages list size changes
     LaunchedEffect(messages.size, isTyping) {
         if (messages.isNotEmpty()) {
@@ -923,6 +926,15 @@ fun DaoChatScreen(
                         )
                     }
 
+                    // Fix 2: Reply Preview above input field
+                    if (replyingTo != null) {
+                        ReplyPreview(
+                            repliedTo = replyingTo,
+                            onCancel = { replyingTo = null },
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                    }
+
                     OutlinedTextField(
                         value = inputText,
                         onValueChange = { inputText = it },
@@ -1048,11 +1060,16 @@ fun DaoChatScreen(
                                         if (attachedFile != null) {
                                             append("📎 [Attached scroll: $attachedFile]\n\n")
                                         }
+                                        // Fix 2: Include reply context in message
+                                        if (replyingTo != null) {
+                                            append("(Replying to: ${replyingTo!!.content.take(50)}...)\n\n")
+                                        }
                                         append(inputText)
                                     }.toString()
                                     onSendMessage(messageToSend)
                                     inputText = ""
                                     attachedFile = null
+                                    replyingTo = null
                                 }
                             },
                             enabled = inputText.isNotBlank() && !isTyping,
