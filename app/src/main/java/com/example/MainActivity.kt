@@ -63,6 +63,7 @@ import com.example.data.repository.UserPreferences
 import com.example.ui.components.SidebarAppItem
 import com.example.ui.components.SidebarHeader
 import com.example.ui.components.SessionItemRow
+import com.example.ui.components.ChatExporter
 import com.example.ui.components.GameHudPanel
 import com.example.ui.components.EmptyOnboardingPrompt
 import com.example.ui.components.MessageBubble
@@ -139,7 +140,10 @@ enum class Screen {
     TerminalEmulator,
     NotesManager,
     SystemMonitor,
-    LearningMode
+    LearningMode,
+    PDFReader,
+    UsageStats,
+    EmailAssistant
 }
 
 @Composable
@@ -220,6 +224,8 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
 
     var showRenameDialog by remember { mutableStateOf<ChatSession?>(null) }
     var renameInput by remember { mutableStateOf("") }
+    
+    var showExportMenu by remember { mutableStateOf<ChatSession?>(null) }
 
     if (showRenameDialog != null) {
         AlertDialog(
@@ -253,6 +259,37 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                     Text("Cancel", color = ZenGold)
                 }
             }
+        )
+    }
+    
+    if (showExportMenu != null) {
+        val context = LocalContext.current
+        AlertDialog(
+            onDismissRequest = { showExportMenu = null },
+            title = { Text("Export Chat", color = ZenGold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        val messages = viewModel.messages.value
+                        val file = ChatExporter(context).exportAsMarkdown(showExportMenu!!, messages)
+                        ChatExporter(context).shareFile(file)
+                        showExportMenu = null
+                    }) { Text("📝 Export as Markdown", color = YinText) }
+                    TextButton(onClick = {
+                        val messages = viewModel.messages.value
+                        val file = ChatExporter(context).exportAsJSON(showExportMenu!!, messages)
+                        ChatExporter(context).shareFile(file)
+                        showExportMenu = null
+                    }) { Text("📊 Export as JSON", color = YinText) }
+                    TextButton(onClick = {
+                        val messages = viewModel.messages.value
+                        val file = ChatExporter(context).exportAsPDF(showExportMenu!!, messages)
+                        ChatExporter(context).shareFile(file)
+                        showExportMenu = null
+                    }) { Text("📄 Export as PDF", color = YinText) }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showExportMenu = null }) { Text("Close", color = ZenGold) } }
         )
     }
 
@@ -495,6 +532,42 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         }
                     )
 
+                    // Utilities Section
+                    Text("Utilities", modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = DaoTextSecondary, fontSize = 12.sp)
+
+                    SidebarAppItem(
+                        title = "PDF Reader",
+                        icon = Icons.Default.PictureAsPdf,
+                        isSelected = currentScreen == Screen.PDFReader,
+                        iconColor = ZenGold,
+                        onClick = {
+                            navigateTo(Screen.PDFReader)
+                            scope.launch { leftDrawerState.close() }
+                        }
+                    )
+
+                    SidebarAppItem(
+                        title = "App Usage",
+                        icon = Icons.Default.BarChart,
+                        isSelected = currentScreen == Screen.UsageStats,
+                        iconColor = ZenBlue,
+                        onClick = {
+                            navigateTo(Screen.UsageStats)
+                            scope.launch { leftDrawerState.close() }
+                        }
+                    )
+
+                    SidebarAppItem(
+                        title = "Email Assistant",
+                        icon = Icons.Default.Email,
+                        isSelected = currentScreen == Screen.EmailAssistant,
+                        iconColor = Color(0xFF4FC3F7),
+                        onClick = {
+                            navigateTo(Screen.EmailAssistant)
+                            scope.launch { leftDrawerState.close() }
+                        }
+                    )
+
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
@@ -586,6 +659,9 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                                     onRename = {
                                         showRenameDialog = session
                                         renameInput = session.title
+                                    },
+                                    onExport = {
+                                        showExportMenu = session
                                     }
                                 )
                             }
@@ -782,6 +858,24 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                     }
                     Screen.LearningMode -> {
                         com.example.ui.screens.LearningModeScreen(
+                            isDark = isDarkThemeOverride,
+                            onMenuClick = { scope.launch { leftDrawerState.open() } }
+                        )
+                    }
+                    Screen.PDFReader -> {
+                        com.example.ui.screens.PDFReaderScreen(
+                            isDark = isDarkThemeOverride,
+                            onMenuClick = { scope.launch { leftDrawerState.open() } }
+                        )
+                    }
+                    Screen.UsageStats -> {
+                        com.example.ui.screens.UsageStatsScreen(
+                            isDark = isDarkThemeOverride,
+                            onMenuClick = { scope.launch { leftDrawerState.open() } }
+                        )
+                    }
+                    Screen.EmailAssistant -> {
+                        com.example.ui.screens.EmailAssistantScreen(
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } }
                         )
