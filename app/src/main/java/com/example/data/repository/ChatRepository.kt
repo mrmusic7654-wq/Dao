@@ -9,6 +9,38 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlin.math.abs
 
+// RPM Rate Limiter (Fix 29)
+object RateLimiter {
+    private val requestTimestamps = mutableListOf<Long>()
+    private var maxRPM = 15 // Default for most Gemini models
+    
+    fun setLimit(rpm: Int) { maxRPM = rpm }
+    
+    fun canMakeRequest(): Boolean {
+        val now = System.currentTimeMillis()
+        val oneMinuteAgo = now - 60000
+        synchronized(requestTimestamps) {
+            requestTimestamps.removeAll { it < oneMinuteAgo }
+            return requestTimestamps.size < maxRPM
+        }
+    }
+    
+    fun recordRequest() {
+        synchronized(requestTimestamps) {
+            requestTimestamps.add(System.currentTimeMillis())
+        }
+    }
+    
+    fun getRemainingRequests(): Int {
+        val now = System.currentTimeMillis()
+        val oneMinuteAgo = now - 60000
+        synchronized(requestTimestamps) {
+            requestTimestamps.removeAll { it < oneMinuteAgo }
+            return maxRPM - requestTimestamps.size
+        }
+    }
+}
+
 class ChatRepository(private val chatDao: ChatDao) {
 
     val allSessions: Flow<List<ChatSession>> = chatDao.getAllSessions()
@@ -115,10 +147,13 @@ class ChatRepository(private val chatDao: ChatDao) {
             xp = 0L,
             yinBalance = 0.5f,
             levelName = "Zen Neophyte",
-            harmonyStreak = 0
+            harmonyStreak = 0,
+            tokenTotal = 0L,
+            tokenLimit = 1_000_000L
         )
 
         val newXp = currentProfile.xp + tokenUsage
+        val newTokenTotal = currentProfile.tokenTotal + tokenUsage
         
         // Running average of Yin balance
         // If we get an impact, we blend it into the running balance (0f to 1f, where 0.5f is perfect harmony)
@@ -141,7 +176,9 @@ class ChatRepository(private val chatDao: ChatDao) {
             xp = newXp,
             yinBalance = newYinBalance,
             levelName = newLevelName,
-            harmonyStreak = newStreak
+            harmonyStreak = newStreak,
+            tokenTotal = newTokenTotal,
+            tokenLimit = currentProfile.tokenLimit
         )
         chatDao.insertOrUpdateProfile(updatedProfile)
     }

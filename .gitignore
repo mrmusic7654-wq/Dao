@@ -4,25 +4,41 @@
 *.o
 *.obj
 *.out
-build/
+*.so
+*.dll
+*.exe
+*.pyc
+__pycache__/
+
 # Dependencies
 node_modules/
 venv/
 .venv/
-__pycache__/
-.mypy_cache/
-.pytest_cache/
-target/
-.gradle/
-# Logs and temp files
-*.log
-*.tmp
-*.swp
-# Environment
 .env
 .env.local
-*.env.*
-# Editors
+.env.*
+
+# Build directories (common in Android/Kotlin projects)
+build/
+.gradle/
+target/
+
+# IDE files
 .vscode/
 .idea/
+*.swp
+*.swo
+*.tmp
+
+# Logs
+*.log
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# System files
+.DS_Store
+Thumbs.db
 ```

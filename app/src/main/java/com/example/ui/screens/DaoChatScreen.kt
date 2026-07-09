@@ -406,10 +406,14 @@ fun DaoChatScreen(
                                 modifier = Modifier.background(if (isDarkBackground) YinCardBg else YangCardBg)
                             ) {
                                 val models = listOf(
-                                    Pair("gemini-2.5-flash", "⚡ Fast, balanced multimodality"),
-                                    Pair("gemini-2.5-pro", "🧠 Deep reasoning & code expert"),
-                                    Pair("gemini-1.5-flash", "🌊 High throughput, fast response"),
-                                    Pair("gemini-1.5-pro", "🔮 Large context expert reasoning")
+                                    Pair("gemini-2.5-flash", "⚡ Gemini 2.5 Flash — Fast, 1M context, 15 RPM, 1M TPM"),
+                                    Pair("gemini-2.5-pro", "🧠 Gemini 2.5 Pro — Deep reasoning, 1M context, 10 RPM, 1M TPM"),
+                                    Pair("gemini-2.5-flash-lite", "💨 Gemini 2.5 Flash-Lite — Lightweight, 1M context, 30 RPM, 250K TPM"),
+                                    Pair("gemini-2.0-flash", "🚀 Gemini 2.0 Flash — Stable, 1M context, 15 RPM, 1M TPM"),
+                                    Pair("gemini-1.5-flash", "🌊 Gemini 1.5 Flash — High throughput, 1M context"),
+                                    Pair("gemini-1.5-pro", "🔮 Gemini 1.5 Pro — Expert reasoning, 2M context"),
+                                    Pair("gemma-3-27b", "🦾 Gemma 3 27B — Open model, 128K context"),
+                                    Pair("gemma-3-12b", "🪶 Gemma 3 12B — Lightweight open model, 128K context")
                                 )
                                 models.forEach { (modelId, desc) ->
                                     DropdownMenuItem(
@@ -417,12 +421,23 @@ fun DaoChatScreen(
                                             Column {
                                                 Text(modelId, fontWeight = FontWeight.Bold, color = if (isDarkBackground) YinText else YangText)
                                                 Text(desc, style = MaterialTheme.typography.labelSmall, color = if (isDarkBackground) YinTextSecondary else YangTextSecondary)
+                                                // Show RPM/TPM for current model
+                                                when (modelId) {
+                                                    "gemini-2.5-flash" -> Text("15 RPM • 1M TPM • 64K output", fontSize = 9.sp, color = ZenGold)
+                                                    "gemini-2.5-pro" -> Text("10 RPM • 1M TPM • 64K output", fontSize = 9.sp, color = ZenGold)
+                                                    "gemini-2.5-flash-lite" -> Text("30 RPM • 250K TPM • 64K output", fontSize = 9.sp, color = ZenGold)
+                                                    "gemini-2.0-flash" -> Text("15 RPM • 1M TPM • 64K output", fontSize = 9.sp, color = ZenGold)
+                                                    "gemini-1.5-flash" -> Text("15 RPM • 1M TPM • 8K output", fontSize = 9.sp, color = ZenGold)
+                                                    "gemini-1.5-pro" -> Text("10 RPM • 1M TPM • 8K output", fontSize = 9.sp, color = ZenGold)
+                                                    "gemma-3-27b" -> Text("Context: 128K input • 8K output", fontSize = 9.sp, color = ZenGold)
+                                                    "gemma-3-12b" -> Text("Context: 128K input • 8K output", fontSize = 9.sp, color = ZenGold)
+                                                }
                                             }
                                         },
                                         onClick = {
                                             activeModel = modelId
                                             showModelMenu = false
-                                            Toast.makeText(context, "Switched intelligence to $modelId mode", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "Switched to $modelId", Toast.LENGTH_SHORT).show()
                                         }
                                     )
                                 }
@@ -895,42 +910,67 @@ fun DaoChatScreen(
                         maxLines = 4
                     )
 
-                    Button(
-                        onClick = {
-                            if (prefs.hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            if (inputText.isNotBlank() && !isTyping) {
-                                val messageToSend = StringBuilder().apply {
-                                    if (selectedTools.isNotEmpty()) {
-                                        append("[ACTIVE WORKSPACES AUTHORIZED: ")
-                                        append(selectedTools.joinToString(", "))
-                                        append("]\n\n")
-                                    }
-                                    if (attachedFile != null) {
-                                        append("📎 [Attached scroll: $attachedFile]\n\n")
-                                    }
-                                    append(inputText)
-                                }.toString()
-                                onSendMessage(messageToSend)
-                                inputText = ""
-                                attachedFile = null
-                            }
-                        },
-                        enabled = inputText.isNotBlank() && !isTyping,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .testTag("send_message_button"),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = ZenGold,
-                            disabledContainerColor = if (isDarkBackground) Color(0xFF24242A) else Color(0xFFDDD8CC)
-                        ),
-                        contentPadding = PaddingValues(0.dp),
-                        shape = CircleShape
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Send,
-                            contentDescription = "Send",
-                            tint = Color.Black,
-                            modifier = Modifier.size(18.dp)
+                    // Token counter (Fix 27 Step 2)
+                    val currentTokenCount = remember(inputText) { com.example.ui.components.estimateTokens(inputText) }
+                    val maxTokensForModel = when (activeModel) {
+                        "gemini-2.5-flash" -> 65536
+                        "gemini-2.5-pro" -> 65536
+                        "gemini-2.5-flash-lite" -> 65536
+                        "gemini-2.0-flash" -> 65536
+                        "gemini-1.5-flash" -> 8192
+                        "gemini-1.5-pro" -> 8192
+                        else -> 8192
+                    }
+                    
+                    Column(modifier = Modifier.weight(1f)) {
+                        Button(
+                            onClick = {
+                                if (prefs.hapticEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                if (inputText.isNotBlank() && !isTyping) {
+                                    val messageToSend = StringBuilder().apply {
+                                        if (selectedTools.isNotEmpty()) {
+                                            append("[ACTIVE WORKSPACES AUTHORIZED: ")
+                                            append(selectedTools.joinToString(", "))
+                                            append("]\n\n")
+                                        }
+                                        if (attachedFile != null) {
+                                            append("📎 [Attached scroll: $attachedFile]\n\n")
+                                        }
+                                        append(inputText)
+                                    }.toString()
+                                    onSendMessage(messageToSend)
+                                    inputText = ""
+                                    attachedFile = null
+                                }
+                            },
+                            enabled = inputText.isNotBlank() && !isTyping,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .testTag("send_message_button"),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ZenGold,
+                                disabledContainerColor = if (isDarkBackground) Color(0xFF24242A) else Color(0xFFDDD8CC)
+                            ),
+                            contentPadding = PaddingValues(0.dp),
+                            shape = CircleShape
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Send,
+                                contentDescription = "Send",
+                                tint = Color.Black,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        
+                        // Token counter display below send button (Fix 27 Step 2)
+                        Text(
+                            text = "📊 ${currentTokenCount} tokens (~${(currentTokenCount * 100 / maxTokensForModel).coerceAtMost(100)}% of ${maxTokensForModel / 1000}K max)",
+                            color = if (currentTokenCount > maxTokensForModel * 0.8) ZenRed 
+                                    else if (currentTokenCount > maxTokensForModel * 0.5) Color(0xFFFF9800) 
+                                    else YinTextSecondary,
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.padding(start = 16.dp, bottom = 4.dp)
                         )
                     }
                 }
