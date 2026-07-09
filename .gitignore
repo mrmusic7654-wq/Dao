@@ -9,36 +9,33 @@ target/
 
 # Dependencies
 .gradle/
-node_modules/
-venv/
-.venv/
-__pycache__/
 .mypy_cache/
 .pytest_cache/
-
-# Editors
-.vscode/
-.idea/
-*.swp
-*.swo
+__pycache__/
+coverage/
+htmlcov/
+.node_modules/
+venv/
+.venv/
 
 # Logs and temp files
 *.log
 *.tmp
-
-# System files
-.DS_Store
-Thumbs.db
+*.swp
+*.swo
 
 # Environment
 .env
 .env.local
 *.env.*
 
-# Coverage
-coverage/
-htmlcov/
-.coverage
+# Editors
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
 
 # Compressed files
 *.zip

@@ -48,6 +48,30 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+
+// Fix 3: AdBlocker with custom filter lists
+object AdBlocker {
+    private val blockedHosts = listOf(
+        "doubleclick.net", "googleadservices.com", "googlesyndication.com",
+        "adservice.google.com", "ad.doubleclick.net", "pagead2.googlesyndication.com",
+        "amazon-adsystem.com", "moatads.com", "scorecardresearch.com",
+        "outbrain.com", "taboola.com", "criteo.com", "adnxs.com"
+    )
+
+    private val blockedPatterns = listOf(
+        Regex(".*/ads/.*"), Regex(".*/ad/.*"), Regex(".*/banner.*"),
+        Regex(".*/popup.*"), Regex(".*/sponsor.*")
+    )
+
+    fun shouldBlock(url: String): Boolean {
+        try {
+            val host = java.net.URL(url).host
+            if (blockedHosts.any { host.contains(it) }) return true
+            if (blockedPatterns.any { it.matches(url) }) return true
+        } catch (_: Exception) {}
+        return false
+    }
+}
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.example.ui.automation.AutomationEventBus
@@ -479,6 +503,15 @@ fun BrowserScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                                     userAgentString = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36"
                                 }
                                 webViewClient = object : WebViewClient() {
+                                    // Fix 3: AdBlocker - intercept requests to block ads
+                                    override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
+                                        val url = request?.url?.toString() ?: return null
+                                        if (AdBlocker.shouldBlock(url)) {
+                                            return WebResourceResponse("text/plain", "UTF-8", null)
+                                        }
+                                        return super.shouldInterceptRequest(view, request)
+                                    }
+                                    
                                     override fun onPageStarted(v: WebView?, url: String?, f: Bitmap?) {
                                         url?.let { urlInput = it; currentUrl = it }; isLoading = true; loadProgress = 0
                                     }
