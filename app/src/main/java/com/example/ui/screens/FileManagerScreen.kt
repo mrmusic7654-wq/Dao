@@ -491,7 +491,7 @@ fun FileManagerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                         // Navigate to the parent directory first
                         val targetFile = File(path)
                         val parentPath = targetFile.parent ?: getCurrentPath()
-                        currentPath = parentPath
+                        if (activePane == 0) leftPath = parentPath else rightPath = parentPath
                         refreshFiles(parentPath)
                         delay(500)
                         // Then compress (will compress current directory)
