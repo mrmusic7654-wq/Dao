@@ -536,3 +536,49 @@ private fun getFileName(context: Context, uri: Uri): String {
     }
     return name
 }
+
+// Fix 6: Transition Effects Between Clips
+enum class Transition(
+    val label: String,
+    val icon: String,
+    val durationMs: Long = 500
+) {
+    NONE("None", "➡️", 0),
+    FADE("Fade", "🌑", 500),
+    SLIDE_LEFT("Slide Left", "⬅️", 500),
+    SLIDE_RIGHT("Slide Right", "➡️", 500),
+    SLIDE_UP("Slide Up", "⬆️", 500),
+    SLIDE_DOWN("Slide Down", "⬇️", 500),
+    ZOOM_IN("Zoom In", "🔍", 500),
+    ZOOM_OUT("Zoom Out", "🔎", 500),
+    WIPE("Wipe", "🧹", 500),
+    DISSOLVE("Dissolve", "✨", 800)
+}
+
+data class ClipTransition(
+    val fromClipId: String,
+    val toClipId: String,
+    val transition: Transition = Transition.NONE
+)
+
+@Composable
+fun TransitionSelector(
+    currentTransition: Transition,
+    onSelect: (Transition) -> Unit
+) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(Transition.entries.toList()) { transition ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.width(60.dp).clip(RoundedCornerShape(8.dp))
+                    .background(if (currentTransition == transition) ZenGold.copy(alpha = 0.2f) else Color.Transparent)
+                    .border(1.dp, if (currentTransition == transition) ZenGold else Color.Transparent, RoundedCornerShape(8.dp))
+                    .clickable { onSelect(transition) }
+                    .padding(8.dp)
+            ) {
+                Text(transition.icon, fontSize = 20.sp)
+                Text(transition.label, fontSize = 9.sp, color = YinTextSecondary)
+            }
+        }
+    }
+}
