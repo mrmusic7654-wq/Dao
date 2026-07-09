@@ -79,6 +79,8 @@ dependencies {
 
   // Biometric
 implementation("androidx.biometric:biometric:1.1.0")
+  // UI Automator for human-like interaction (tap, scroll, type, read screen)
+  implementation("androidx.test.uiautomator:uiautomator:2.2.0")
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)
