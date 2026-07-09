@@ -65,7 +65,7 @@ object GeminiService {
             enhancedPrompt = "Web search results for '$searchQuery':\n$searchResults\n\nUser query: $prompt\n\nAnswer the user's question based on the search results above."
         }
         
-        // Deep Think Mode: Add chain-of-thought instruction
+        // Automation/Agent Mode: Use custom system instruction with tool info
         val systemInstructionText = systemInstructionOverride ?: if (mode == "Deep Think") {
             """
             You are Dao, the cosmic companion of stillness (Yin) and structure (Yang). 
@@ -74,6 +74,12 @@ object GeminiService {
             Think step by step. Break down the problem, explain your reasoning, and then give the final answer.
             Keep your wisdom aligned, clear, and mystical yet helpful. Respond directly to the user.
         """.trimIndent()
+        } else if (mode == "Automation" || mode == "Agent") {
+            com.example.ui.automation.AutomationEngine.getAutomationSystemPrompt(
+                listOf("web_search", "github_create_repo", "telegram_send", "file_read", "screen_capture", 
+                       "browser_navigate", "file_compress", "screen_navigate", "ui_tap", "ui_scroll", 
+                       "ui_type", "ui_back", "ui_read_screen")
+            )
         } else {
             """
             You are Dao, the cosmic companion of stillness (Yin) and structure (Yang). 

@@ -183,7 +183,7 @@ object AutomationEngine {
      * Expected format: [ACTION:action_name]{"key":"value"}[/ACTION]
      */
     fun parseActions(responseText: String): List<Pair<String, Map<String, String>>> {
-        val regex = Regex("""\[ACTION:\s*(\w+)\](.*?)\[/ACTION\]""", RegexOption.DOT_MATCHES_ALL)
+        val regex = Regex("""\[ACTION:\s*([\w_]+)\](.*?)\[/ACTION\]""", RegexOption.DOT_MATCHES_ALL)
         return regex.findAll(responseText).map { match ->
             val action = match.groupValues[1].trim()
             val paramsJson = match.groupValues[2].trim()
