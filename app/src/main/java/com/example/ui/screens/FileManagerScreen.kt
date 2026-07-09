@@ -41,6 +41,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.ExperimentalFoundationApi
 import com.example.ui.automation.AutomationEventBus
 import com.example.ui.theme.*
 import kotlinx.coroutines.*
@@ -269,16 +272,19 @@ object FileUtils {
         return try {
             val pm = context.packageManager
             val packageInfo = pm.getPackageArchiveInfo(apkPath, android.content.pm.PackageManager.GET_ACTIVITIES)
-            packageInfo?.let {
-                val appInfo = it.applicationInfo
-                appInfo.sourceDir = apkPath
-                appInfo.publicSourceDir = apkPath
-                ApkInfo(
-                    packageName = it.packageName,
-                    versionName = it.versionName ?: "Unknown",
-                    versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) it.longVersionCode else it.versionCode.toLong(),
-                    appName = pm.getApplicationLabel(appInfo).toString()
-                )
+            packageInfo?.let { pkgInfo ->
+                val appInfo = pkgInfo.applicationInfo
+                appInfo?.let { info ->
+                    info.sourceDir = apkPath
+                    info.publicSourceDir = apkPath
+                    ApkInfo(
+                        packageName = pkgInfo.packageName,
+                        versionName = pkgInfo.versionName ?: "Unknown",
+                        versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) pkgInfo.longVersionCode else pkgInfo.versionCode.toLong(),
+                        appName = pm.getApplicationLabel(info).toString(),
+                        icon = pm.getApplicationIcon(info)
+                    )
+                } ?: ApkInfo(packageName = "unknown", versionName = "?", versionCode = 0, appName = "Unknown", icon = null)
             }
         } catch (e: Exception) { null }
     }

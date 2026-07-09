@@ -6,7 +6,6 @@ import android.os.Build
 import android.os.Environment
 import android.os.StatFs
 import android.provider.DocumentsContract
-import androidx.documentfile.provider.DocumentFile
 import java.io.*
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
@@ -412,17 +411,19 @@ object FileOperations {
         return try {
             val pm = context.packageManager
             val packageInfo = pm.getPackageArchiveInfo(apkPath, android.content.pm.PackageManager.GET_ACTIVITIES)
-            packageInfo?.let {
-                val appInfo = it.applicationInfo
-                appInfo.sourceDir = apkPath
-                appInfo.publicSourceDir = apkPath
-                ApkInfo(
-                    packageName = it.packageName,
-                    versionName = it.versionName ?: "Unknown",
-                    versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) it.longVersionCode else it.versionCode.toLong(),
-                    appName = pm.getApplicationLabel(appInfo).toString(),
-                    icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null }
-                )
+            packageInfo?.let { pkgInfo ->
+                val appInfo = pkgInfo.applicationInfo
+                appInfo?.let { info ->
+                    info.sourceDir = apkPath
+                    info.publicSourceDir = apkPath
+                    ApkInfo(
+                        packageName = pkgInfo.packageName,
+                        versionName = pkgInfo.versionName ?: "Unknown",
+                        versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) pkgInfo.longVersionCode else pkgInfo.versionCode.toLong(),
+                        appName = pm.getApplicationLabel(info).toString(),
+                        icon = try { pm.getApplicationIcon(info) } catch (e: Exception) { null }
+                    )
+                } ?: ApkInfo(packageName = "unknown", versionName = "?", versionCode = 0, appName = "Unknown", icon = null)
             }
         } catch (e: Exception) { null }
     }
@@ -438,11 +439,18 @@ object FileOperations {
     fun readFileAsHex(file: File, maxBytes: Int = 1024): String {
         return try {
             val bytes = file.inputStream().use { it.readBytes().take(maxBytes).toByteArray() }
-            bytes.chunked(16).joinToString("\n") { chunk ->
-                val hex = chunk.joinToString(" ") { "%02X".format(it) }.padEnd(48)
-                val ascii = chunk.map { if (it in 32..126) it.toChar() else '.' }.joinToString("")
-                "$hex  $ascii"
+            val result = StringBuilder()
+            for (i in bytes.indices step 16) {
+                val end = minOf(i + 16, bytes.size)
+                val hexParts = mutableListOf<String>()
+                val asciiParts = mutableListOf<Char>()
+                for (j in i until end) {
+                    hexParts.add("%02X".format(bytes[j]))
+                    asciiParts.add(if (bytes[j].toInt() in 32..126) bytes[j].toInt().toChar() else '.')
+                }
+                result.appendLine("${hexParts.joinToString(" ").padEnd(48)}  ${asciiParts.joinToString("")}")
             }
+            result.toString()
         } catch (e: Exception) { "Cannot read file: ${e.message}" }
     }
     
