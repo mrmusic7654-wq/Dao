@@ -9,10 +9,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlin.math.abs
 
-// RPM Rate Limiter (Fix 29)
+// RPM Rate Limiter (Fix 29, Fix 37)
 object RateLimiter {
     private val requestTimestamps = mutableListOf<Long>()
-    private var maxRPM = 15 // Default for most Gemini models
+    private var maxRPM = 10 // Default for most Gemini models
     
     fun setLimit(rpm: Int) { maxRPM = rpm }
     
@@ -38,6 +38,32 @@ object RateLimiter {
             requestTimestamps.removeAll { it < oneMinuteAgo }
             return maxRPM - requestTimestamps.size
         }
+    }
+    
+    fun updateRateLimit(model: String) {
+        setLimit(when (model) {
+            // Core Text & Multimodal
+            "gemini-3.5-flash" -> 10
+            "gemini-3.1-flash-lite" -> 15
+            "gemini-3-flash-preview" -> 10
+            "gemini-3.1-pro-preview" -> 5
+            "gemini-2.5-pro" -> 5
+            "gemini-2.5-flash" -> 10
+            // Audio & Voice
+            "gemini-3.1-flash-live-preview" -> 10
+            "gemini-3.1-flash-tts-preview" -> 10
+            "gemini-2.5-flash-live-preview" -> 5
+            "gemini-2.5-flash-tts-preview" -> 10
+            "gemini-2.5-pro-tts-preview" -> 5
+            // Image Generation
+            "gemini-2.5-flash-image" -> 5
+            "nano-banana-2-preview" -> 5
+            "nano-banana-pro-preview" -> 2
+            // Embeddings
+            "gemini-embedding-2-preview" -> 15
+            "text-embedding-004" -> 15
+            else -> 10
+        })
     }
 }
 
