@@ -49,6 +49,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import com.example.ui.automation.AutomationEventBus
+import com.example.ui.theme.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.delay
+
 // Fix 3: AdBlocker with custom filter lists
 object AdBlocker {
     private val blockedHosts = listOf(
@@ -72,12 +79,6 @@ object AdBlocker {
         return false
     }
 }
-import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
-import com.example.ui.automation.AutomationEventBus
-import com.example.ui.theme.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.delay
 import java.io.File
 import java.net.URLDecoder
 import java.util.*
