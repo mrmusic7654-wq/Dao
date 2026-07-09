@@ -37,6 +37,9 @@ interface ChatDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: ChatMessage): Long
 
+    @Query("UPDATE chat_messages SET content = :content WHERE id = :messageId")
+    suspend fun updateMessageContent(messageId: Long, content: String)
+
     // --- User Profile ---
     @Query("SELECT * FROM user_profile WHERE id = 1 LIMIT 1")
     fun getUserProfile(): Flow<UserProfile?>

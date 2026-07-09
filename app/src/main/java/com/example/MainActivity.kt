@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -134,7 +135,31 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
     val leftDrawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val rightDrawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    
+    // Navigation stack for back navigation
+    val navigationStack = remember { mutableStateListOf(Screen.DaoChat) }
     var currentScreen by remember { mutableStateOf(Screen.DaoChat) }
+    
+    fun navigateTo(screen: Screen) {
+        if (screen != navigationStack.lastOrNull()) {
+            navigationStack.add(screen)
+        }
+        currentScreen = screen
+    }
+    
+    fun goBack(): Boolean {
+        if (navigationStack.size > 1) {
+            navigationStack.removeLast()
+            currentScreen = navigationStack.last()
+            return true
+        }
+        return false
+    }
+    
+    // Handle back press
+    BackHandler(enabled = navigationStack.size > 1) {
+        goBack()
+    }
 
     val sessions by viewModel.allSessions.collectAsStateWithLifecycle()
     val activeSessionId by viewModel.activeSessionId.collectAsStateWithLifecycle()
@@ -152,20 +177,20 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
         com.example.ui.automation.AutomationEventBus.events.collect { event ->
             if (event.action == "open") {
                 when (event.targetScreen) {
-                    "Browser" -> currentScreen = Screen.Browser
-                    "FileManager" -> currentScreen = Screen.FileManager
-                    "VideoEditor" -> currentScreen = Screen.VideoEditor
-                    "CodeEditor" -> currentScreen = Screen.CodeEditor
-                    "GitHub" -> currentScreen = Screen.GitHub
-                    "Telegram" -> currentScreen = Screen.Telegram
-                    "ImageEditor" -> currentScreen = Screen.ImageEditor
-                    "DocumentScanner" -> currentScreen = Screen.DocumentScanner
-                    "CloudStorageHub" -> currentScreen = Screen.CloudStorageHub
-                    "PasswordVault" -> currentScreen = Screen.PasswordVault
-                    "NotesManager" -> currentScreen = Screen.NotesManager
-                    "TerminalEmulator" -> currentScreen = Screen.TerminalEmulator
-                    "AutomationDashboard" -> currentScreen = Screen.AutomationDashboard
-                    "ScreenRecorder" -> currentScreen = Screen.ScreenRecorder
+                    "Browser" -> navigateTo(Screen.Browser)
+                    "FileManager" -> navigateTo(Screen.FileManager)
+                    "VideoEditor" -> navigateTo(Screen.VideoEditor)
+                    "CodeEditor" -> navigateTo(Screen.CodeEditor)
+                    "GitHub" -> navigateTo(Screen.GitHub)
+                    "Telegram" -> navigateTo(Screen.Telegram)
+                    "ImageEditor" -> navigateTo(Screen.ImageEditor)
+                    "DocumentScanner" -> navigateTo(Screen.DocumentScanner)
+                    "CloudStorageHub" -> navigateTo(Screen.CloudStorageHub)
+                    "PasswordVault" -> navigateTo(Screen.PasswordVault)
+                    "NotesManager" -> navigateTo(Screen.NotesManager)
+                    "TerminalEmulator" -> navigateTo(Screen.TerminalEmulator)
+                    "AutomationDashboard" -> navigateTo(Screen.AutomationDashboard)
+                    "ScreenRecorder" -> navigateTo(Screen.ScreenRecorder)
                 }
             }
         }
@@ -228,7 +253,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
             ) {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     SidebarHeader(onNewChatClick = {
-                        currentScreen = Screen.DaoChat
+                        navigateTo(Screen.DaoChat)
                         viewModel.createNewSession()
                         scope.launch { leftDrawerState.close() }
                     })
@@ -251,7 +276,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         isSelected = currentScreen == Screen.DaoChat,
                         iconColor = ZenGold,
                         onClick = {
-                            currentScreen = Screen.DaoChat
+                            navigateTo(Screen.DaoChat)
                             scope.launch { leftDrawerState.close() }
                         }
                     )
@@ -262,7 +287,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         isSelected = currentScreen == Screen.Telegram,
                         iconColor = Color(0xFF0088CC),
                         onClick = {
-                            currentScreen = Screen.Telegram
+                            navigateTo(Screen.Telegram)
                             scope.launch { leftDrawerState.close() }
                         }
                     )
@@ -273,7 +298,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         isSelected = currentScreen == Screen.AutomationDashboard,
                         iconColor = Color(0xFFFF9800),
                         onClick = {
-                            currentScreen = Screen.AutomationDashboard
+                            navigateTo(Screen.AutomationDashboard)
                             scope.launch { leftDrawerState.close() }
                         }
                     )
@@ -296,7 +321,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         isSelected = currentScreen == Screen.VideoEditor,
                         iconColor = ZenRed,
                         onClick = {
-                            currentScreen = Screen.VideoEditor
+                            navigateTo(Screen.VideoEditor)
                             scope.launch { leftDrawerState.close() }
                         }
                     )
@@ -307,7 +332,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         isSelected = currentScreen == Screen.ImageEditor,
                         iconColor = Color(0xFF4FC3F7),
                         onClick = {
-                            currentScreen = Screen.ImageEditor
+                            navigateTo(Screen.ImageEditor)
                             scope.launch { leftDrawerState.close() }
                         }
                     )
@@ -318,7 +343,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         isSelected = currentScreen == Screen.DocumentScanner,
                         iconColor = Color(0xFFFF8A65),
                         onClick = {
-                            currentScreen = Screen.DocumentScanner
+                            navigateTo(Screen.DocumentScanner)
                             scope.launch { leftDrawerState.close() }
                         }
                     )
@@ -329,7 +354,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         isSelected = currentScreen == Screen.ScreenRecorder,
                         iconColor = Color(0xFFE91E63),
                         onClick = {
-                            currentScreen = Screen.ScreenRecorder
+                            navigateTo(Screen.ScreenRecorder)
                             scope.launch { leftDrawerState.close() }
                         }
                     )
@@ -352,7 +377,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         isSelected = currentScreen == Screen.FileManager,
                         iconColor = ZenSienna,
                         onClick = {
-                            currentScreen = Screen.FileManager
+                            navigateTo(Screen.FileManager)
                             scope.launch { leftDrawerState.close() }
                         }
                     )
@@ -363,7 +388,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         isSelected = currentScreen == Screen.CloudStorageHub,
                         iconColor = Color(0xFF42A5F5),
                         onClick = {
-                            currentScreen = Screen.CloudStorageHub
+                            navigateTo(Screen.CloudStorageHub)
                             scope.launch { leftDrawerState.close() }
                         }
                     )
@@ -374,7 +399,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         isSelected = currentScreen == Screen.PasswordVault,
                         iconColor = Color(0xFF7C4DFF),
                         onClick = {
-                            currentScreen = Screen.PasswordVault
+                            navigateTo(Screen.PasswordVault)
                             scope.launch { leftDrawerState.close() }
                         }
                     )
@@ -397,7 +422,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         isSelected = currentScreen == Screen.CodeEditor,
                         iconColor = Color(0xFF9C27B0),
                         onClick = {
-                            currentScreen = Screen.CodeEditor
+                            navigateTo(Screen.CodeEditor)
                             scope.launch { leftDrawerState.close() }
                         }
                     )
@@ -408,7 +433,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         isSelected = currentScreen == Screen.GitHub,
                         iconColor = Color(0xFF6E40C9),
                         onClick = {
-                            currentScreen = Screen.GitHub
+                            navigateTo(Screen.GitHub)
                             scope.launch { leftDrawerState.close() }
                         }
                     )
@@ -419,7 +444,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         isSelected = currentScreen == Screen.TerminalEmulator,
                         iconColor = Color(0xFF00FF00),
                         onClick = {
-                            currentScreen = Screen.TerminalEmulator
+                            navigateTo(Screen.TerminalEmulator)
                             scope.launch { leftDrawerState.close() }
                         }
                     )
@@ -442,7 +467,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         isSelected = currentScreen == Screen.Browser,
                         iconColor = ZenBlue,
                         onClick = {
-                            currentScreen = Screen.Browser
+                            navigateTo(Screen.Browser)
                             scope.launch { leftDrawerState.close() }
                         }
                     )
@@ -453,7 +478,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         isSelected = currentScreen == Screen.NotesManager,
                         iconColor = Color(0xFFFFD54F),
                         onClick = {
-                            currentScreen = Screen.NotesManager
+                            navigateTo(Screen.NotesManager)
                             scope.launch { leftDrawerState.close() }
                         }
                     )
@@ -539,7 +564,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                                     session = session,
                                     isActive = isActive,
                                     onSelect = {
-                                        currentScreen = Screen.DaoChat
+                                        navigateTo(Screen.DaoChat)
                                         viewModel.selectSession(session.id)
                                         scope.launch { rightDrawerState.close() }
                                     },
@@ -632,7 +657,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                             isTyping = isTyping,
                             onSendMessage = { viewModel.sendMessage(it) },
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
-                            onBackClick = { currentScreen = Screen.DaoChat },
+                            onBackClick = { navigateTo(Screen.DaoChat },
                             onRightMenuClick = { scope.launch { rightDrawerState.open() } },
                             onNewDiscourseClick = { viewModel.createNewSession() },
                             themeMode = themeMode,
@@ -648,21 +673,21 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         VideoEditorScreen(
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
-                            onBackClick = { currentScreen = Screen.DaoChat }
+                            onBackClick = { navigateTo(Screen.DaoChat }
                         )
                     }
                     Screen.Browser -> {
                         BrowserScreen(
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
-                            onBackClick = { currentScreen = Screen.DaoChat }
+                            onBackClick = { navigateTo(Screen.DaoChat }
                         )
                     }
                     Screen.FileManager -> {
                         FileManagerScreen(
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
-                            onBackClick = { currentScreen = Screen.DaoChat }
+                            onBackClick = { navigateTo(Screen.DaoChat }
                         )
                     }
                     Screen.CodeEditor -> {
@@ -670,77 +695,77 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
                             onRightMenuClick = { scope.launch { rightDrawerState.open() } },
-                            onBackClick = { currentScreen = Screen.DaoChat }
+                            onBackClick = { navigateTo(Screen.DaoChat }
                         )
                     }
                     Screen.GitHub -> {
                         GitHubScreen(
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
-                            onBackClick = { currentScreen = Screen.DaoChat }
+                            onBackClick = { navigateTo(Screen.DaoChat }
                         )
                     }
                     Screen.Telegram -> {
                         TelegramScreen(
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
-                            onBackClick = { currentScreen = Screen.DaoChat }
+                            onBackClick = { navigateTo(Screen.DaoChat }
                         )
                     }
                     Screen.AutomationDashboard -> {
                         AutomationDashboard(
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
-                            onBackClick = { currentScreen = Screen.DaoChat }
+                            onBackClick = { navigateTo(Screen.DaoChat }
                         )
                     }
                     Screen.ImageEditor -> {
                         ImageEditorScreen(
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
-                            onBackClick = { currentScreen = Screen.DaoChat }
+                            onBackClick = { navigateTo(Screen.DaoChat }
                         )
                     }
                     Screen.CloudStorageHub -> {
                         CloudStorageHubScreen(
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
-                            onBackClick = { currentScreen = Screen.DaoChat }
+                            onBackClick = { navigateTo(Screen.DaoChat }
                         )
                     }
                     Screen.PasswordVault -> {
                         PasswordVaultScreen(
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
-                            onBackClick = { currentScreen = Screen.DaoChat }
+                            onBackClick = { navigateTo(Screen.DaoChat }
                         )
                     }
                     Screen.DocumentScanner -> {
                         DocumentScannerScreen(
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
-                            onBackClick = { currentScreen = Screen.DaoChat }
+                            onBackClick = { navigateTo(Screen.DaoChat }
                         )
                     }
                     Screen.ScreenRecorder -> {
                         ScreenRecorderScreen(
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
-                            onBackClick = { currentScreen = Screen.DaoChat }
+                            onBackClick = { navigateTo(Screen.DaoChat }
                         )
                     }
                     Screen.TerminalEmulator -> {
                         TerminalEmulatorScreen(
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
-                            onBackClick = { currentScreen = Screen.DaoChat }
+                            onBackClick = { navigateTo(Screen.DaoChat }
                         )
                     }
                     Screen.NotesManager -> {
                         NotesManagerScreen(
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
-                            onBackClick = { currentScreen = Screen.DaoChat }
+                            onBackClick = { navigateTo(Screen.DaoChat }
                         )
                     }
                 }

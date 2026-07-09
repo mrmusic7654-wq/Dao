@@ -52,6 +52,14 @@ class ChatRepository(private val chatDao: ChatDao) {
         return userMsg
     }
 
+    suspend fun insertMessagePlaceholder(message: ChatMessage): Long {
+        return chatDao.insertMessage(message)
+    }
+
+    suspend fun updateMessageContent(messageId: Long, content: String) {
+        chatDao.updateMessageContent(messageId, content)
+    }
+
     suspend fun generateAndSaveDaoResponse(context: android.content.Context, sessionId: Long, userMessageContent: String, personality: String = "Zen Sage", mode: String = "Direct", systemInstructionOverride: String? = null): ChatMessage {
         val prefs = UserPreferences(context)
         val response = when (prefs.aiProvider) {
