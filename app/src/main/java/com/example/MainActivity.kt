@@ -138,7 +138,8 @@ enum class Screen {
     ScreenRecorder,
     TerminalEmulator,
     NotesManager,
-    SystemMonitor
+    SystemMonitor,
+    LearningMode
 }
 
 @Composable
@@ -776,7 +777,13 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                         NotesManagerScreen(
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
-                            onBackClick = { navigateTo(Screen.DaoChat }
+                            onBackClick = { navigateTo(Screen.DaoChat) }
+                        )
+                    }
+                    Screen.LearningMode -> {
+                        com.example.ui.screens.LearningModeScreen(
+                            isDark = isDarkThemeOverride,
+                            onMenuClick = { scope.launch { leftDrawerState.open() } }
                         )
                     }
                 }
