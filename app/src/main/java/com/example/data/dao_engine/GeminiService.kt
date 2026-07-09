@@ -26,7 +26,8 @@ object GeminiService {
         context: Context,
         prompt: String,
         personality: String,
-        mode: String
+        mode: String,
+        systemInstructionOverride: String? = null
     ): DaoResponse = withContext(Dispatchers.IO) {
         val prefs = UserPreferences(context)
         val apiKey = prefs.geminiApiKey
@@ -65,7 +66,7 @@ object GeminiService {
         }
         
         // Deep Think Mode: Add chain-of-thought instruction
-        val systemInstructionText = if (mode == "Deep Think") {
+        val systemInstructionText = systemInstructionOverride ?: if (mode == "Deep Think") {
             """
             You are Dao, the cosmic companion of stillness (Yin) and structure (Yang). 
             Embody the personality vibe of: $personality.

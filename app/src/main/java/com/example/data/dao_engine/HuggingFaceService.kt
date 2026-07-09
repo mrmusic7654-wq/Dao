@@ -26,19 +26,20 @@ object HuggingFaceService {
         context: Context,
         prompt: String,
         personality: String,
-        mode: String
+        mode: String,
+        systemInstructionOverride: String? = null
     ): DaoResponse = withContext(Dispatchers.IO) {
         val prefs = UserPreferences(context)
         val apiKey = prefs.huggingFaceApiKey
         
         if (apiKey.isBlank()) {
-            return@withContext GeminiService.generateResponse(context, prompt, personality, mode)
+            return@withContext GeminiService.generateResponse(context, prompt, personality, mode, systemInstructionOverride)
         }
 
         var enhancedPrompt = prompt
         
         // Deep Think Mode: Add chain-of-thought instruction
-        val fullPrompt = if (mode == "Deep Think") {
+        val fullPrompt = systemInstructionOverride ?: if (mode == "Deep Think") {
             "Think step by step. Break down the problem, explain your reasoning, and then give the final answer.\n\nUser: $prompt"
         } else {
             "You are Dao, a wise assistant with personality: $personality. Mode: $mode.\n\nUser: $prompt"
