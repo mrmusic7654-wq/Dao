@@ -13,6 +13,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
+import okhttp3.sse.EventSources
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
@@ -217,7 +218,7 @@ object GeminiService {
             }
         }
 
-        val eventSource = client.newEventSourceFactory().newEventSource(request, eventSourceListener)
+        val eventSource = EventSources.createFactory(client).newEventSource(request, eventSourceListener)
 
         awaitClose {
             isCancelled.set(true)
