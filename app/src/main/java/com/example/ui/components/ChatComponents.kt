@@ -30,6 +30,13 @@ import com.example.data.model.UserProfile
 import com.example.ui.theme.*
 import com.example.ui.util.buildFormattedAnnotatedString
 
+// Token estimation utility function (Fix 31)
+fun estimateTokens(text: String): Int {
+    val words = text.split(Regex("\\s+")).filter { it.isNotBlank() }.size
+    val punctuation = text.count { it in ".,!?;:()[]{}\"'`-@#\$%^&*+=<>/" }
+    return (words * 1.3 + punctuation * 0.5).toInt().coerceAtLeast(1)
+}
+
 @Composable
 fun GameHudPanel(profile: UserProfile, isDark: Boolean) {
     var level = 1L
@@ -130,6 +137,19 @@ fun GameHudPanel(profile: UserProfile, isDark: Boolean) {
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isDark) YinTextSecondary else YangTextSecondary,
                 fontSize = 9.sp
+            )
+        }
+        
+        // Session token counter (Fix 27 Step 4)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            Text(
+                text = "📊 Session: ~${profile.xp} tokens",
+                color = YinTextSecondary.copy(alpha = 0.6f),
+                fontSize = 8.sp,
+                fontFamily = FontFamily.Monospace
             )
         }
     }
@@ -306,6 +326,20 @@ fun MessageBubble(
                     )
                 }
             }
+        }
+        
+        // Per-message token count (Fix 27 Step 3)
+        Row(
+            horizontalArrangement = Arrangement.End,
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp)
+        ) {
+            val tokens = estimateTokens(message.content)
+            Text(
+                text = "~$tokens tk",
+                color = YinTextSecondary.copy(alpha = 0.5f),
+                fontSize = 8.sp,
+                fontFamily = FontFamily.Monospace
+            )
         }
     }
 }
@@ -509,7 +543,7 @@ fun CodeBlockCard(code: String, language: String) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = language.uppercase(),
+                    text = "${language.uppercase()} • ~${estimateTokens(code)} tokens",
                     color = ZenGold,
                     fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp,

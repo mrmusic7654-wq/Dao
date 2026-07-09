@@ -28,5 +28,7 @@ data class UserProfile(
     val xp: Long = 0L,
     val yinBalance: Float = 0.5f,
     val levelName: String = "Curious Mind",
-    val harmonyStreak: Int = 0
+    val harmonyStreak: Int = 0,
+    val tokenTotal: Long = 0L,
+    val tokenLimit: Long = 1_000_000L // 1M TPM default
 )

@@ -825,6 +825,7 @@ fun SettingsDialog(
                                     .border(1.dp, if (isDark) Color(0xFF2E2E36) else Color(0xFFD2CDBC), RoundedCornerShape(8.dp))
                                     .clickable {
                                         val sessions = viewModel.allSessions.value
+                                        val profile = viewModel.userProfile.value
                                         val jsonObject = JSONObject().apply {
                                             put("exporter", prefs.userName)
                                             put("email", prefs.userEmail)
@@ -837,6 +838,10 @@ fun SettingsDialog(
                                             put("ai_temperature", prefs.aiTemperature)
                                             put("max_tokens", prefs.maxTokens)
                                             put("node_client", "3.6.0-Zen-Pro")
+                                            // Token stats (Fix 33)
+                                            put("total_tokens_used", profile.xp)
+                                            put("token_limit", 1_000_000L)
+                                            put("estimated_cost", if (profile.xp > 0) "Free tier" else "N/A")
                                             put("discourses", JSONArray().apply {
                                                 sessions.forEach { sess ->
                                                     put(JSONObject().apply {
