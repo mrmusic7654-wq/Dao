@@ -77,6 +77,33 @@ data class GitHubNotification(
     val isUnread: Boolean
 )
 
+// Fix 5: Code Diff Viewer data models
+enum class DiffType { ADDED, REMOVED, UNCHANGED, HEADER }
+data class DiffLine(val text: String, val type: DiffType)
+
+fun generateDiff(oldCode: String, newCode: String): List<DiffLine> {
+    val oldLines = oldCode.split("\n")
+    val newLines = newCode.split("\n")
+    val result = mutableListOf<DiffLine>()
+
+    // Simple line-by-line comparison
+    val maxLen = maxOf(oldLines.size, newLines.size)
+    for (i in 0 until maxLen) {
+        val oldLine = oldLines.getOrNull(i)
+        val newLine = newLines.getOrNull(i)
+        when {
+            oldLine == null -> result.add(DiffLine("+ $newLine", DiffType.ADDED))
+            newLine == null -> result.add(DiffLine("- $oldLine", DiffType.REMOVED))
+            oldLine == newLine -> result.add(DiffLine("  $oldLine", DiffType.UNCHANGED))
+            else -> {
+                result.add(DiffLine("- $oldLine", DiffType.REMOVED))
+                result.add(DiffLine("+ $newLine", DiffType.ADDED))
+            }
+        }
+    }
+    return result
+}
+
 enum class GitHubTab { REPOS, ISSUES, PULLS, NOTIFICATIONS, ACTIONS, AGENT }
 
 // ==================== GITHUB API SERVICE ====================
@@ -611,6 +638,41 @@ private fun GitHubAgentPanel(token: String, isDark: Boolean) {
                 }
                 commandInput = ""
             }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6E40C9))) { Text("Run", color = Color.White) }
+        }
+    }
+}
+
+// Fix 5: Diff Viewer composable for code review
+@Composable
+fun DiffViewer(oldCode: String, newCode: String, fileName: String) {
+    val diffLines = remember(oldCode, newCode) { generateDiff(oldCode, newCode) }
+
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF0F0F12))) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(fileName, color = ZenGold, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                items(diffLines) { line ->
+                    Text(
+                        text = line.text,
+                        color = when (line.type) {
+                            DiffType.ADDED -> Color(0xFF4CAF50)
+                            DiffType.REMOVED -> ZenRed
+                            DiffType.UNCHANGED -> YinTextSecondary
+                            DiffType.HEADER -> ZenGold
+                        },
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.background(
+                            when (line.type) {
+                                DiffType.ADDED -> Color(0xFF4CAF50).copy(alpha = 0.1f)
+                                DiffType.REMOVED -> ZenRed.copy(alpha = 0.1f)
+                                else -> Color.Transparent
+                            }
+                        ).fillMaxWidth().padding(horizontal = 4.dp, vertical = 1.dp)
+                    )
+                }
+            }
         }
     }
 }
