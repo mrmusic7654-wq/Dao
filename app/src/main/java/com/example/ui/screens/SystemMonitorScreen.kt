@@ -26,7 +26,7 @@ import kotlinx.coroutines.delay
 import java.io.File
 
 @Composable
-fun SystemMonitorScreen(isDark: Boolean, onBackClick: () -> Unit) {
+fun SystemMonitorScreen(isDark: Boolean, onMenuClick: () -> Unit) {
     val context = LocalContext.current
     
     // State for metrics
@@ -117,8 +117,8 @@ fun SystemMonitorScreen(isDark: Boolean, onBackClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("System Monitor", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = if (isDark) DaoTextPrimary else Color.Black)
-            IconButton(onClick = onBackClick) {
-                Icon(Icons.Default.Close, "Close", tint = if (isDark) DaoTextPrimary else Color.Black)
+            IconButton(onClick = onMenuClick) {
+                Icon(Icons.Default.Menu, "Menu", tint = if (isDark) DaoTextPrimary else Color.Black)
             }
         }
         
