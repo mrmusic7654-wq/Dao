@@ -124,6 +124,33 @@ object AutomationEngine {
                 }
                 "Opened $screenName"
             }
+            "ui_tap" -> {
+                val text = parameters["text"] ?: return@withContext "Missing text to tap"
+                val service = DaoAccessibilityService.instance
+                if (service == null) {
+                    "Accessibility Service not enabled. Please enable Dao in Settings > Accessibility."
+                } else {
+                    val success = service.findAndTap(text)
+                    if (success) "Tapped: $text" else "Could not find: $text"
+                }
+            }
+            "ui_scroll" -> {
+                val service = DaoAccessibilityService.instance ?: return@withContext "Accessibility Service not enabled"
+                if (service.scrollForward()) "Scrolled forward" else "Could not scroll"
+            }
+            "ui_type" -> {
+                val text = parameters["text"] ?: return@withContext "Missing text to type"
+                val service = DaoAccessibilityService.instance ?: return@withContext "Accessibility Service not enabled"
+                if (service.typeText(text)) "Typed: $text" else "Could not type"
+            }
+            "ui_back" -> {
+                val service = DaoAccessibilityService.instance ?: return@withContext "Accessibility Service not enabled"
+                if (service.pressBack()) "Pressed back" else "Failed"
+            }
+            "ui_read_screen" -> {
+                val service = DaoAccessibilityService.instance ?: return@withContext "Accessibility Service not enabled"
+                service.getScreenText().take(3000)
+            }
             else -> "Unknown action: $action"
         }
     }
@@ -190,6 +217,11 @@ Available tools:
 - browser_navigate: url (string) — Open browser and navigate to URL
 - file_compress: path (string) — Compress a file/folder into a zip
 - screen_navigate: screen (string) — Navigate to a specific screen (browser, filemanager, videoeditor, etc.)
+- ui_tap: text (string) — Tap a button or element by its text
+- ui_scroll: (none) — Scroll the current screen
+- ui_type: text (string) — Type text into the focused field
+- ui_back: (none) — Press the back button
+- ui_read_screen: (none) — Read all text visible on screen
 
 Do not output anything else besides the action block when performing an action. When the task is finished, respond with a summary.
         """.trimIndent()

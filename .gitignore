@@ -1,43 +1,52 @@
 ```
 # Compiled and build artifacts
 *.class
-*.o
-*.obj
-*.out
-build/
-target/
-
+*.dex
+*.so
+*.aar
+*.apk
+*.jar
+obj/
 # Dependencies
-.gradle/
-.mypy_cache/
-.pytest_cache/
-__pycache__/
 node_modules/
-venv/
-.venv/
-
-# Logs and temp files
-*.log
+.gradle/
+# Build outputs
+build/
+.externalNativeBuild/
+.cxx/
+# IDE files
+.idea/
+*.iml
+*.iws
+.vscode/
+# Temp files
 *.tmp
-*.swp
-
+*.temp
 # Environment
 .env
 .env.local
-*.env.*
-
-# Editors
-.vscode/
-.idea/
-*.swp
-*.swo
-
+.env.*
+# Logs
+*.log
 # Coverage
 coverage/
 htmlcov/
 .coverage
-
-# System files
-.DS_Store
-Thumbs.db
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+# Distribution / packaging
+.dist-info/
+*.egg-info/
+.installed.cfg
+*.egg
+# Unit test / coverage reports
+.junit
+.pytest_cache/
+.mypy_cache/
+# Local configuration file (sdk path, etc)
+local.properties
 ```
