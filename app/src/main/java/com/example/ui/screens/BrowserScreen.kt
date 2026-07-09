@@ -53,6 +53,7 @@ import androidx.core.content.FileProvider
 import com.example.ui.automation.AutomationEventBus
 import com.example.ui.theme.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.delay
 import java.io.File
 import java.net.URLDecoder
 import java.util.*
@@ -220,6 +221,24 @@ fun BrowserScreen(isDark: Boolean, onMenuClick: () -> Unit) {
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                 storagePermissionLauncher.launch(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE))
             }
+        }
+    }
+
+    // Process pending automation actions for Browser screen
+    LaunchedEffect(Unit) {
+        while (true) {
+            val action = com.example.ui.automation.PendingActions.queue.poll()
+            if (action != null && action.targetScreen == "Browser") {
+                when (action.action) {
+                    "load_url" -> {
+                        val url = action.parameters["url"] ?: continue
+                        webView?.loadUrl(url)
+                        urlInput = url
+                        currentUrl = url
+                    }
+                }
+            }
+            delay(300)
         }
     }
 

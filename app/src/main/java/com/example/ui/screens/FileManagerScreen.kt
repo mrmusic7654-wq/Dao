@@ -8,6 +8,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -43,6 +44,7 @@ import androidx.core.content.FileProvider
 import com.example.ui.automation.AutomationEventBus
 import com.example.ui.theme.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.delay
 import java.io.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -449,11 +451,15 @@ fun FileManagerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
         // Request MANAGE_EXTERNAL_STORAGE for Android 11+ full file access
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
-                val intent = Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                }
                 context.startActivity(intent)
-                Toast.makeText(context, "Please grant 'All files access' to see all files", Toast.LENGTH_LONG).show()
             }
         }
+        
+        // Wait a moment for permission, then load
+        delay(1000)
         
         val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
@@ -472,6 +478,37 @@ fun FileManagerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
         }
         if (permissions.isNotEmpty()) permissionLauncher.launch(permissions.toTypedArray())
         refreshFiles(leftPath, 0); refreshFiles(rightPath, 1); loadStorageInfo()
+    }
+
+    // Process pending automation actions for FileManager screen
+    LaunchedEffect(Unit) {
+        while (true) {
+            val action = com.example.ui.automation.PendingActions.queue.poll()
+            if (action != null && action.targetScreen == "FileManager") {
+                when (action.action) {
+                    "compress" -> {
+                        val path = action.parameters["path"] ?: continue
+                        // Navigate to the parent directory first
+                        val targetFile = File(path)
+                        val parentPath = targetFile.parent ?: getCurrentPath()
+                        navigateTo(parentPath)
+                        delay(500)
+                        // Then compress (will compress current directory)
+                        isWorking = true; workMessage = "Compressing..."
+                        CoroutineScope(Dispatchers.IO).launch {
+                            val outputFile = File(File(getCurrentPath()), "archive_${System.currentTimeMillis()}.zip")
+                            val success = FileUtils.createZip(File(getCurrentPath()), outputFile)
+                            withContext(Dispatchers.Main) {
+                                isWorking = false
+                                Toast.makeText(context, if (success) "Archive created" else "Compression failed", Toast.LENGTH_SHORT).show()
+                                if (success) refreshFiles(getCurrentPath())
+                            }
+                        }
+                    }
+                }
+            }
+            delay(300)
+        }
     }
 
     // Listen for automation events - use getCurrentPath() instead of currentPath
