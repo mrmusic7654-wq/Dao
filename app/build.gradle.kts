@@ -77,6 +77,10 @@ googleServices {
 // This makes it easy to add them back in the future if needed.
 dependencies {
 
+  // Coil for image caching
+  implementation("io.coil-kt:coil-compose:2.5.0")
+  // Jsoup for web scraping
+  implementation("org.jsoup:jsoup:1.17.2")
   // Biometric
 implementation("androidx.biometric:biometric:1.1.0")
   // UI Automator for human-like interaction (tap, scroll, type, read screen)
@@ -103,7 +107,7 @@ implementation("androidx.biometric:biometric:1.1.0")
   // implementation(libs.androidx.navigation.compose)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
-  // implementation(libs.coil.compose)
+  implementation(libs.coil.compose)
   implementation(libs.converter.moshi)
   implementation(libs.firebase.ai)
   implementation(libs.firebase.appcheck.recaptcha)

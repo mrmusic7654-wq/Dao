@@ -82,6 +82,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Set crash handler (Fix 18)
+        Thread.setDefaultUncaughtExceptionHandler(CrashHandler(this))
         // Set activity reference for screen capture
         com.example.ui.automation.AutomationEngine.mainActivity = this
         enableEdgeToEdge()
@@ -99,6 +101,14 @@ class MainActivity : ComponentActivity() {
             MyApplicationTheme(darkTheme = isDark) {
                 MainLayout(viewModel = viewModel, themeMode = themeMode, isDarkThemeOverride = isDark)
             }
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent?) {
+        super.onNewIntent(intent)
+        // Handle auto_prompt from Document Q&A (Fix 15)
+        intent?.getStringExtra("auto_prompt")?.let { prompt ->
+            viewModel.sendMessage(prompt)
         }
     }
 
@@ -127,7 +137,8 @@ enum class Screen {
     DocumentScanner,
     ScreenRecorder,
     TerminalEmulator,
-    NotesManager
+    NotesManager,
+    SystemMonitor
 }
 
 @Composable

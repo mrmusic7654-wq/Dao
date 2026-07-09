@@ -20,3 +20,21 @@ val ZenGoldBright = Color(0xFFFFD700)   // Pure flame
 val ZenBlue = Color(0xFF5E81AC)         // Peaceful stream blue
 val ZenRed = Color(0xFFBF616A)          // Fiery active red
 val ZenSienna = Color(0xFFD08770)       // Earth clay sienna
+
+// --- Dao Standardized Colors (Fix 12) ---
+// Backgrounds
+val DaoBackground = Color(0xFF0A0A0E)
+val DaoSurface = Color(0xFF14141E)
+val DaoCard = Color(0xFF1A1A24)
+val DaoBorder = Color(0xFF333340)
+
+// Text
+val DaoTextPrimary = Color(0xFFE2E2E6)
+val DaoTextSecondary = Color(0xFF8E8E93)
+val DaoTextMuted = Color(0xFF555560)
+
+// Status colors
+val StatusSuccess = Color(0xFF4CAF50)
+val StatusWarning = Color(0xFFFF9800)
+val StatusError = Color(0xFFF44336)
+val StatusInfo = Color(0xFF2196F3)

@@ -1,34 +1,28 @@
 ```
 # Compiled and build artifacts
 *.class
-*.dex
-*.so
-*.aar
-*.apk
-*.jar
-
-# Dependencies
-.gradle/
+*.o
+*.obj
+*.out
 build/
-app/build/
-
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+target/
+.gradle/
 # Logs and temp files
 *.log
 *.tmp
-
+*.swp
 # Environment
 .env
 .env.local
 *.env.*
-
 # Editors
 .vscode/
 .idea/
-*.iml
-*.iws
-*.ipr
-
-# OS generated files
-.DS_Store
-Thumbs.db
 ```
