@@ -1,15 +1,16 @@
 package com.example.ui.screens.filemanager
 
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.StatFs
+import android.provider.DocumentsContract
+import androidx.documentfile.provider.DocumentFile
 import java.io.*
 import java.text.SimpleDateFormat
 import java.util.*
-import java.util.zip.ZipEntry
-import java.util.zip.ZipFile
-import java.util.zip.ZipOutputStream
+import java.util.zip.*
 
 // ==================== DATA MODELS ====================
 
