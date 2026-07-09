@@ -8,6 +8,7 @@ import android.os.StatFs
 import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import java.io.*
+import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.zip.*
@@ -50,6 +51,53 @@ data class ArchiveEntry(
     val method: String,
     val crc: Long
 )
+
+data class ApkInfo(
+    val packageName: String,
+    val versionName: String,
+    val versionCode: Long,
+    val appName: String,
+    val icon: android.graphics.drawable.Drawable?
+)
+
+// ==================== FAVORITES MANAGER ====================
+
+object FavoritesManager {
+    private val favorites = mutableListOf<String>()
+    
+    fun getFavorites(): List<String> = favorites.toList()
+    
+    fun addFavorite(path: String) {
+        if (path !in favorites) favorites.add(path)
+    }
+    
+    fun removeFavorite(path: String) {
+        favorites.remove(path)
+    }
+    
+    fun isFavorite(path: String): Boolean = path in favorites
+    
+    fun toggleFavorite(path: String) {
+        if (isFavorite(path)) removeFavorite(path) else addFavorite(path)
+    }
+}
+
+// ==================== RECENT FILES TRACKER ====================
+
+object RecentFiles {
+    private val recentFiles = mutableListOf<String>()
+    private const val maxRecent = 20
+    
+    fun addRecent(path: String) {
+        recentFiles.remove(path)
+        recentFiles.add(0, path)
+        if (recentFiles.size > maxRecent) recentFiles.removeAt(maxRecent)
+    }
+    
+    fun getRecent(): List<String> = recentFiles.toList()
+    
+    fun clearRecent() { recentFiles.clear() }
+}
 
 // ==================== FILE OPERATIONS ENGINE ====================
 
@@ -335,5 +383,84 @@ object FileOperations {
             "Executable" to file.canExecute().toString(),
             "Hidden" to file.isHidden.toString()
         )
+    }
+    
+    // ==================== CHECKSUM CALCULATION ====================
+    
+    fun calculateChecksum(file: File, algorithm: String = "MD5"): String {
+        return try {
+            val digest = MessageDigest.getInstance(algorithm)
+            file.inputStream().use { input ->
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    digest.update(buffer, 0, bytesRead)
+                }
+            }
+            digest.digest().joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) { "Error: ${e.message}" }
+    }
+    
+    fun verifyChecksum(file: File, expectedHash: String, algorithm: String = "MD5"): Boolean {
+        val actual = calculateChecksum(file, algorithm)
+        return actual.equals(expectedHash, ignoreCase = true)
+    }
+    
+    // ==================== APK INFO VIEWER ====================
+    
+    fun getApkInfo(context: Context, apkPath: String): ApkInfo? {
+        return try {
+            val pm = context.packageManager
+            val packageInfo = pm.getPackageArchiveInfo(apkPath, android.content.pm.PackageManager.GET_ACTIVITIES)
+            packageInfo?.let {
+                val appInfo = it.applicationInfo
+                appInfo.sourceDir = apkPath
+                appInfo.publicSourceDir = apkPath
+                ApkInfo(
+                    packageName = it.packageName,
+                    versionName = it.versionName ?: "Unknown",
+                    versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) it.longVersionCode else it.versionCode.toLong(),
+                    appName = pm.getApplicationLabel(appInfo).toString(),
+                    icon = try { pm.getApplicationIcon(appInfo) } catch (e: Exception) { null }
+                )
+            }
+        } catch (e: Exception) { null }
+    }
+    
+    // ==================== TEXT/HEX VIEWER ====================
+    
+    fun readFileAsText(file: File, maxBytes: Int = 50000): String {
+        return try {
+            file.inputStream().use { it.readBytes().take(maxBytes).toByteArray().toString(Charsets.UTF_8) }
+        } catch (e: Exception) { "Cannot read file: ${e.message}" }
+    }
+    
+    fun readFileAsHex(file: File, maxBytes: Int = 1024): String {
+        return try {
+            val bytes = file.inputStream().use { it.readBytes().take(maxBytes).toByteArray() }
+            bytes.chunked(16).joinToString("\n") { chunk ->
+                val hex = chunk.joinToString(" ") { "%02X".format(it) }.padEnd(48)
+                val ascii = chunk.map { if (it in 32..126) it.toChar() else '.' }.joinToString("")
+                "$hex  $ascii"
+            }
+        } catch (e: Exception) { "Cannot read file: ${e.message}" }
+    }
+    
+    // ==================== FOLDER SIZE CALCULATOR ====================
+    
+    fun calculateFolderSize(folder: File, onProgress: ((Long) -> Unit)? = null): Long {
+        var totalSize = 0L
+        val queue = LinkedList<File>()
+        queue.add(folder)
+        
+        while (queue.isNotEmpty()) {
+            val current = queue.poll()
+            if (current.isDirectory) {
+                current.listFiles()?.forEach { queue.add(it) }
+            } else {
+                totalSize += current.length()
+            }
+        }
+        return totalSize
     }
 }

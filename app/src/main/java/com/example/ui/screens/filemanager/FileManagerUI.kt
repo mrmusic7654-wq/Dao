@@ -1,5 +1,6 @@
 package com.example.ui.screens.filemanager
 
+import android.content.Context
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -26,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
+import kotlinx.coroutines.*
 import java.io.File
 
 // ==================== FILE ICON MAPPER ====================
@@ -457,6 +459,215 @@ fun SortDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
+}
+
+// ==================== FAVORITES SIDEBAR ====================
+
+@Composable
+fun FavoritesSidebar(
+    favorites: List<String>,
+    onNavigate: (String) -> Unit,
+    onRemove: (String) -> Unit
+) {
+    Column {
+        Text("⭐ Favorites", color = ZenGold, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+        favorites.forEach { path ->
+            Row(modifier = Modifier.fillMaxWidth().clickable { onNavigate(path) }.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Icon(Icons.Default.Star, null, tint = ZenGold, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(File(path).name, color = YinText, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                IconButton(onClick = { onRemove(path) }, modifier = Modifier.size(20.dp)) {
+                    Icon(Icons.Default.Close, null, tint = YinTextSecondary.copy(alpha = 0.5f), modifier = Modifier.size(12.dp))
+                }
+            }
+        }
+    }
+}
+
+// ==================== CONTEXT MENU ====================
+
+@Composable
+fun FileContextMenu(
+    file: FileItem,
+    onDismiss: () -> Unit,
+    onOpen: () -> Unit,
+    onCopy: () -> Unit,
+    onMove: () -> Unit,
+    onDelete: () -> Unit,
+    onRename: () -> Unit,
+    onProperties: () -> Unit,
+    onCompress: () -> Unit,
+    onShare: () -> Unit,
+    onChecksum: () -> Unit,
+    onAddFavorite: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(file.name, color = ZenGold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        text = {
+            Column {
+                ContextMenuItem("Open", Icons.Default.OpenInNew, onOpen)
+                ContextMenuItem("Copy", Icons.Default.ContentCopy, onCopy)
+                ContextMenuItem("Move", Icons.Default.DriveFileMove, onMove)
+                ContextMenuItem("Delete", Icons.Default.Delete, onDelete, ZenRed)
+                ContextMenuItem("Rename", Icons.Default.Edit, onRename)
+                ContextMenuItem("Compress", Icons.Default.Archive, onCompress)
+                ContextMenuItem("Share", Icons.Default.Share, onShare)
+                ContextMenuItem("Checksum", Icons.Default.Security, onChecksum)
+                ContextMenuItem("Properties", Icons.Default.Info, onProperties)
+                ContextMenuItem(
+                    if (FavoritesManager.isFavorite(file.path)) "Remove Favorite" else "Add to Favorites",
+                    Icons.Default.Star, onAddFavorite
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+    )
+}
+
+@Composable
+fun ContextMenuItem(label: String, icon: ImageVector, onClick: () -> Unit, color: Color = YinText) {
+    Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp)) {
+        Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(label, color = color, fontSize = 14.sp)
+    }
+}
+
+// ==================== APK INFO DIALOG ====================
+
+@Composable
+fun ApkInfoDialog(apkPath: String, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var apkInfo by remember { mutableStateOf<ApkInfo?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    
+    LaunchedEffect(apkPath) {
+        withContext(Dispatchers.IO) {
+            apkInfo = FileOperations.getApkInfo(context, apkPath)
+            isLoading = false
+        }
+    }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("📱 APK Info", color = ZenGold) },
+        text = {
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(30.dp), color = ZenGold)
+            } else {
+                apkInfo?.let {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        InfoRow("App Name", it.appName)
+                        InfoRow("Package", it.packageName)
+                        InfoRow("Version", "${it.versionName} (${it.versionCode})")
+                    }
+                } ?: Text("Cannot read APK info", color = Color.Gray)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+    )
+}
+
+@Composable
+fun InfoRow(label: String, value: String) {
+    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+        Text(label, color = YinTextSecondary, fontSize = 12.sp)
+        Text(value, color = YinText, fontSize = 12.sp, modifier = Modifier.widthIn(max = 200.dp))
+    }
+}
+
+// ==================== TEXT/HEX VIEWER DIALOG ====================
+
+@Composable
+fun TextViewerDialog(
+    file: File,
+    viewMode: TextViewMode,
+    onDismiss: () -> Unit
+) {
+    var content by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(true) }
+    
+    LaunchedEffect(file) {
+        withContext(Dispatchers.IO) {
+            content = when (viewMode) {
+                TextViewMode.TEXT -> FileOperations.readFileAsText(file)
+                TextViewMode.HEX -> FileOperations.readFileAsHex(file)
+            }
+            isLoading = false
+        }
+    }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (viewMode == TextViewMode.TEXT) "📄 Text View" else "🔢 Hex View", color = ZenGold) },
+        text = {
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(30.dp), color = ZenGold)
+            } else {
+                Box(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).background(Color(0xFF1A1A20)).padding(8.dp)) {
+                    Text(content, color = YinText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+    )
+}
+
+enum class TextViewMode { TEXT, HEX }
+
+// ==================== BATCH RENAME DIALOG ====================
+
+@Composable
+fun BatchRenameDialog(
+    files: List<File>,
+    onDismiss: () -> Unit,
+    onRename: (String, Int) -> Unit
+) {
+    var prefix by remember { mutableStateOf("") }
+    var startNumber by remember { mutableIntStateOf(1) }
+    var extension by remember { mutableStateOf(files.firstOrNull()?.extension ?: "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Batch Rename ${files.size} files", color = ZenGold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = prefix, onValueChange = { prefix = it }, label = { Text("Prefix") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = startNumber.toString(), onValueChange = { startNumber = it.toIntOrNull() ?: 1 },
+                    label = { Text("Start number") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = extension, onValueChange = { extension = it }, label = { Text("Extension") }, modifier = Modifier.fillMaxWidth())
+                Text("Example: ${prefix}${startNumber}.$extension", color = YinTextSecondary, fontSize = 11.sp)
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                files.forEachIndexed { index, file ->
+                    val newName = "$prefix${startNumber + index}.$extension"
+                    onRename(newName, index)
+                }
+                onDismiss()
+            }) { Text("Rename All") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+// ==================== DUAL PANE TOGGLE ====================
+
+@Composable
+fun DualPaneToggle(
+    isDualPane: Boolean,
+    onToggle: () -> Unit
+) {
+    IconButton(onClick = onToggle) {
+        Icon(
+            if (isDualPane) Icons.Default.ViewColumn else Icons.Default.ViewAgenda,
+            contentDescription = "Toggle dual pane",
+            tint = if (isDualPane) ZenGold else YinTextSecondary
+        )
+    }
 }
 
 // ==================== SEARCH RESULTS ====================
