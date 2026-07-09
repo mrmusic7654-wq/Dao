@@ -281,10 +281,9 @@ object FileUtils {
                         packageName = pkgInfo.packageName,
                         versionName = pkgInfo.versionName ?: "Unknown",
                         versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) pkgInfo.longVersionCode else pkgInfo.versionCode.toLong(),
-                        appName = pm.getApplicationLabel(info).toString(),
-                        icon = pm.getApplicationIcon(info)
+                        appName = pm.getApplicationLabel(info).toString()
                     )
-                } ?: ApkInfo(packageName = "unknown", versionName = "?", versionCode = 0, appName = "Unknown", icon = null)
+                } ?: ApkInfo(packageName = "unknown", versionName = "?", versionCode = 0, appName = "Unknown")
             }
         } catch (e: Exception) { null }
     }
@@ -1185,6 +1184,7 @@ fun FileContextMenu(
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ContextMenuItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit, color: Color = YinText) {
     Row(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = {}).padding(vertical = 10.dp, horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1196,6 +1196,7 @@ fun ContextMenuItem(label: String, icon: androidx.compose.ui.graphics.vector.Ima
 
 // ==================== FAVORITES SIDEBAR ====================
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FavoritesSidebar(
     favorites: List<String>,
