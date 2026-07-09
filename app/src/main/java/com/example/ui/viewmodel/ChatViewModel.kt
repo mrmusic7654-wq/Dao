@@ -229,50 +229,31 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             
             val mode = _activeInputMode.value
             if (mode == "Automation" || mode == "Agent") {
-                // Multistep automation loop with planning step
                 var currentPrompt = content
-                var maxSteps = 20  // Safety limit increased for complex tasks
+                var maxSteps = 25
                 
-                // First, ask the AI to create a plan
-                val planPrompt = "You are in Automation mode. The user wants: $content. " +
-                    "First, produce a concise step-by-step plan. Then, output actions to execute each step using the [ACTION:...] format. " +
-                    "After each action, you will receive the result. Continue until all steps are complete. " +
-                    "If the task is too long, output [CONTINUE] to signal you need more steps. Begin now."
-                val planResponse = repository.generateAndSaveDaoResponse(getApplication(), sessionId, planPrompt, _activePersonality.value, mode)
-                currentPrompt = planResponse.content
-                
-                while (maxSteps-- > 0) {
+                while (maxSteps-- > 0 && !automationCancelled) {
+                    while (automationPaused && !automationCancelled) { delay(500) }
+                    if (automationCancelled) break
+
                     val response = repository.generateAndSaveDaoResponse(
                         getApplication(), sessionId, currentPrompt,
                         _activePersonality.value, mode
                     )
-                    // Check if response contains actions
-                    val actions = com.example.ui.automation.AutomationEngine.parseActions(response.content)
-                    
-                    // Check for [CONTINUE] tag - self-continuation
-                    if (actions.isEmpty() && response.content.contains("[CONTINUE]")) {
-                        currentPrompt = "Continue with the next step."
-                        continue
-                    }
-                    
-                    if (actions.isEmpty()) {
-                        // No actions, task complete
-                        break
-                    }
 
-                    // Execute each action and collect results
+                    val actions = com.example.ui.automation.AutomationEngine.parseActions(response.content)
+                    if (actions.isEmpty()) break
+
                     val results = mutableListOf<String>()
                     for ((action, params) in actions) {
                         val result = com.example.ui.automation.AutomationEngine.executeAction(action, params, getApplication())
-                        results.add(result)
+                        results.add("[$action] $result")
                     }
 
-                    // Feed results back as the next prompt
-                    currentPrompt = results.joinToString("\n\n") + 
-                        "\n\nContinue the task or respond if done."
+                    currentPrompt = "Results:\n${results.joinToString("\n")}\n\nContinue the task or respond if complete."
                 }
+                _isDaoTyping.value = false
             } else {
-                // Normal mode: just generate a single response
                 // Simulate natural spiritual typing delay (e.g. 1.2 seconds) to build dramatic, game-like anticipation
                 kotlinx.coroutines.delay(1200)
                 
