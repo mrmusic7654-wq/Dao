@@ -1,43 +1,57 @@
 ```
-# Compiled and build artifacts
-*.class
-*.dex
-*.so
-*.aar
+# Android build artifacts
 *.apk
-*.jar
+*.aar
+*.dex
 
-# Dependencies
+# Android dependency directories
 .libs/
-lib/
-external/
-
-# Build outputs
-build/
 .externalNativeBuild/
-.intermediates/
-.packaged/
-outputs/
-
-# Gradle
 .gradle/
-.gradle-wrapper/
+local.properties
 
-# IDE
+# IDE files
 .idea/
 *.iml
-*.ipr
 *.iws
 .vscode/
-.settings/
-.project
 
-# Temp files
-*.tmp
-*.temp
+# Build directories
+build/
+bin/
+gen/
+out/
+
+# Log files
 *.log
 
-# Local configuration
-local.properties
-gradle.properties
+# Environment
+.env
+.env.local
+*.env.*
+
+# Temporary files
+*.tmp
+*.temp
+*~
+.DS_Store
+Thumbs.db
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# Python cache (if any Python files exist in the project)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Node modules (if any JS/TS files exist in the project)
+node_modules/
+
+# Virtual environments (if any Python files exist in the project)
+venv/
+.venv/
 ```
