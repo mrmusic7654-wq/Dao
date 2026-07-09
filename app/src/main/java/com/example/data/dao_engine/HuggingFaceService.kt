@@ -79,7 +79,7 @@ object HuggingFaceService {
             )
         } catch (e: Exception) {
             e.printStackTrace()
-            GeminiService.generateResponse(context, prompt, personality, mode)
+            return@withContext GeminiService.generateResponse(context, prompt, personality, mode, systemInstructionOverride = null)
         }
     }
 }

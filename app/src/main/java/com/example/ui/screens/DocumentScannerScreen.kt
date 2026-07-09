@@ -492,9 +492,9 @@ fun DocumentScannerScreen(isDark: Boolean, onMenuClick: () -> Unit) {
                                         ToolChip("Ask Dao", Icons.Default.QuestionAnswer, StatusInfo) {
                                             // Build text from all pages (in a real app, use OCR results)
                                             val docText = "Document: ${currentDocument.name}\nPages: ${currentDocument.pages.size}"
-                                            val intent = android.content.Intent(context, MainActivity::class.java).apply {
+                                            val intent = android.content.Intent(context, context.javaClass).apply {
                                                 putExtra("auto_prompt", "Answer questions about this document:\n\n$docText")
-                                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
                                             }
                                             context.startActivity(intent)
                                             Toast.makeText(context, "Opening Dao Chat with document context...", Toast.LENGTH_SHORT).show()

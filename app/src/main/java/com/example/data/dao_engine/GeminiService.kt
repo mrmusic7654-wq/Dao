@@ -390,30 +390,6 @@ object GeminiService {
         }
     }
 
-    suspend fun generateResponse(
-        context: Context,
-        prompt: String,
-        personality: String,
-        mode: String,
-        preferOffline: Boolean = false
-    ): DaoResponse = withContext(Dispatchers.IO) {
-        val localEngine = LocalInferenceEngine(context)
-
-        if (preferOffline && localEngine.isAvailable()) {
-            val localResponse = localEngine.generate(prompt)
-            return@withContext DaoResponse(
-                replyText = localResponse,
-                yinImpact = 0.5f,
-                yangImpact = 0.5f,
-                xpReward = 5,
-                specialMessage = "Local AI (Offline)"
-            )
-        }
-
-        // Fall back to cloud API
-        generateResponse(context, prompt, personality, mode, null)
-    }
-
     suspend fun generateTTS(
         context: Context,
         text: String,
