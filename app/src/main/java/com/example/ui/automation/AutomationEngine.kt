@@ -151,6 +151,11 @@ object AutomationEngine {
                 val service = DaoAccessibilityService.instance ?: return@withContext "Accessibility Service not enabled"
                 service.getScreenText().take(3000)
             }
+            "wait" -> {
+                val ms = parameters["ms"]?.toLongOrNull() ?: 1000L
+                delay(ms)
+                "Waited for ${ms}ms"
+            }
             else -> "Unknown action: $action"
         }
     }
@@ -221,7 +226,10 @@ Available tools:
 - ui_scroll: (none) — Scroll the current screen
 - ui_type: text (string) — Type text into the focused field
 - ui_back: (none) — Press the back button
-- ui_read_screen: (none) — Read all text visible on screen
+- ui_read_screen: (none) — Read all text visible on screen (use this to verify UI state before tapping)
+- wait: ms (number) — Wait for specified milliseconds before next action (use to let UI settle)
+
+TIP: Before tapping an element, use ui_read_screen to verify it exists. Use wait after navigation to let screens load.
 
 Do not output anything else besides the action block when performing an action. When the task is finished, respond with a summary.
         """.trimIndent()

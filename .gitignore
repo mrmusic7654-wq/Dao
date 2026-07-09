@@ -1,1 +1,41 @@
-Nothing should be ignored since the changes only include source code files (.kt files) and no build artifacts, dependencies, or temporary files.
+```
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android
+*.apk
+*.aar
+*.ap_
+*/build/
+!app/src/main/assets/
+!app/src/main/res/
+
+# Kotlin
+*.kotlin_metadata
+
+# Dependencies
+.libs.versions.toml.lock
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# Temp files
+*.tmp
+*.temp
+*.log
+
+# Environment
+.env
+.env.local
+*.env*
+
+# OS
+.DS_Store
+Thumbs.db
+```

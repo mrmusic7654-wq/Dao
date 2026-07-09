@@ -632,6 +632,7 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                             isTyping = isTyping,
                             onSendMessage = { viewModel.sendMessage(it) },
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
+                            onBackClick = { currentScreen = Screen.DaoChat },
                             onRightMenuClick = { scope.launch { rightDrawerState.open() } },
                             onNewDiscourseClick = { viewModel.createNewSession() },
                             themeMode = themeMode,
@@ -646,86 +647,100 @@ fun MainLayout(viewModel: ChatViewModel, themeMode: MutableState<String>, isDark
                     Screen.VideoEditor -> {
                         VideoEditorScreen(
                             isDark = isDarkThemeOverride,
-                            onMenuClick = { scope.launch { leftDrawerState.open() } }
+                            onMenuClick = { scope.launch { leftDrawerState.open() } },
+                            onBackClick = { currentScreen = Screen.DaoChat }
                         )
                     }
                     Screen.Browser -> {
                         BrowserScreen(
                             isDark = isDarkThemeOverride,
-                            onMenuClick = { scope.launch { leftDrawerState.open() } }
+                            onMenuClick = { scope.launch { leftDrawerState.open() } },
+                            onBackClick = { currentScreen = Screen.DaoChat }
                         )
                     }
                     Screen.FileManager -> {
                         FileManagerScreen(
                             isDark = isDarkThemeOverride,
-                            onMenuClick = { scope.launch { leftDrawerState.open() } }
+                            onMenuClick = { scope.launch { leftDrawerState.open() } },
+                            onBackClick = { currentScreen = Screen.DaoChat }
                         )
                     }
                     Screen.CodeEditor -> {
                         CodeEditorScreen(
                             isDark = isDarkThemeOverride,
                             onMenuClick = { scope.launch { leftDrawerState.open() } },
-                            onRightMenuClick = { scope.launch { rightDrawerState.open() } }
+                            onRightMenuClick = { scope.launch { rightDrawerState.open() } },
+                            onBackClick = { currentScreen = Screen.DaoChat }
                         )
                     }
                     Screen.GitHub -> {
                         GitHubScreen(
                             isDark = isDarkThemeOverride,
-                            onMenuClick = { scope.launch { leftDrawerState.open() } }
+                            onMenuClick = { scope.launch { leftDrawerState.open() } },
+                            onBackClick = { currentScreen = Screen.DaoChat }
                         )
                     }
                     Screen.Telegram -> {
                         TelegramScreen(
                             isDark = isDarkThemeOverride,
-                            onMenuClick = { scope.launch { leftDrawerState.open() } }
+                            onMenuClick = { scope.launch { leftDrawerState.open() } },
+                            onBackClick = { currentScreen = Screen.DaoChat }
                         )
                     }
                     Screen.AutomationDashboard -> {
                         AutomationDashboard(
                             isDark = isDarkThemeOverride,
-                            onMenuClick = { scope.launch { leftDrawerState.open() } }
+                            onMenuClick = { scope.launch { leftDrawerState.open() } },
+                            onBackClick = { currentScreen = Screen.DaoChat }
                         )
                     }
                     Screen.ImageEditor -> {
                         ImageEditorScreen(
                             isDark = isDarkThemeOverride,
-                            onMenuClick = { scope.launch { leftDrawerState.open() } }
+                            onMenuClick = { scope.launch { leftDrawerState.open() } },
+                            onBackClick = { currentScreen = Screen.DaoChat }
                         )
                     }
                     Screen.CloudStorageHub -> {
                         CloudStorageHubScreen(
                             isDark = isDarkThemeOverride,
-                            onMenuClick = { scope.launch { leftDrawerState.open() } }
+                            onMenuClick = { scope.launch { leftDrawerState.open() } },
+                            onBackClick = { currentScreen = Screen.DaoChat }
                         )
                     }
                     Screen.PasswordVault -> {
                         PasswordVaultScreen(
                             isDark = isDarkThemeOverride,
-                            onMenuClick = { scope.launch { leftDrawerState.open() } }
+                            onMenuClick = { scope.launch { leftDrawerState.open() } },
+                            onBackClick = { currentScreen = Screen.DaoChat }
                         )
                     }
                     Screen.DocumentScanner -> {
                         DocumentScannerScreen(
                             isDark = isDarkThemeOverride,
-                            onMenuClick = { scope.launch { leftDrawerState.open() } }
+                            onMenuClick = { scope.launch { leftDrawerState.open() } },
+                            onBackClick = { currentScreen = Screen.DaoChat }
                         )
                     }
                     Screen.ScreenRecorder -> {
                         ScreenRecorderScreen(
                             isDark = isDarkThemeOverride,
-                            onMenuClick = { scope.launch { leftDrawerState.open() } }
+                            onMenuClick = { scope.launch { leftDrawerState.open() } },
+                            onBackClick = { currentScreen = Screen.DaoChat }
                         )
                     }
                     Screen.TerminalEmulator -> {
                         TerminalEmulatorScreen(
                             isDark = isDarkThemeOverride,
-                            onMenuClick = { scope.launch { leftDrawerState.open() } }
+                            onMenuClick = { scope.launch { leftDrawerState.open() } },
+                            onBackClick = { currentScreen = Screen.DaoChat }
                         )
                     }
                     Screen.NotesManager -> {
                         NotesManagerScreen(
                             isDark = isDarkThemeOverride,
-                            onMenuClick = { scope.launch { leftDrawerState.open() } }
+                            onMenuClick = { scope.launch { leftDrawerState.open() } },
+                            onBackClick = { currentScreen = Screen.DaoChat }
                         )
                     }
                 }
